@@ -1,1 +1,15 @@
 This file is to keep track of creates, permissions, etc.
+
+create database analytics;
+
+create table if not exists historical_data (
+yr int,
+real_home_price float,
+nominal_home_price float,
+CPI float,
+SP500 float,
+Tbill float,
+Tbond float,
+HPA float, primary key (yr));
+
+grant all on analytics.historica_data to 'analytics_user'@'%';
