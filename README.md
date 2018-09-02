@@ -1,4 +1,4 @@
-# GitPycharmPractice
-Tools for SOTW
+#SOTW Analytics
+
 
 Analytics and MySQL data storage for SOTW 
