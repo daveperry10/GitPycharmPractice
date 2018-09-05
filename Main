@@ -6,5 +6,10 @@
 # from Utilities import bulkLoad
 # import Utilities
 # import Analytics
+import Charts as ch
+
+ch.gridOfMultiplesAndDiscounts()
+
+
 
 

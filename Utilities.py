@@ -2,13 +2,17 @@
 import pymysql as db
 import pandas as pd
 from pathlib import Path
+import numpy as np
 
 #### Get CONNECTION ####
-connection = db.connect(user='analytics_user', password='sumdata', db='analytics', autocommit=True)
-cursor = connection.cursor()
+def getConnection():
+    connection = db.connect(user='analytics_user', password='sumdata', db='analytics', autocommit=True)
+    cursor = connection.cursor()
+    return cursor
+
 
 ###############################################################################################
-#    BULK LOAD                                                                                #
+#    BULK LOAD HISTORICAL HP DATA                                                             #
 ###############################################################################################
 
 def bulkLoad():
@@ -32,7 +36,12 @@ def bulkLoad():
     return
 
 
+###############################################################################################
+#    CREATE RANDOM NUMBER FILE 10000 x 100                                                             #
+###############################################################################################
 
+def createRandomNumberFile():
+    np.savetxt('RandomNumberFile.txt',np.random.rand(100,5))
+    return
 
-
-
+createRandomNumberFile()
