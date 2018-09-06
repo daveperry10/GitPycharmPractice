@@ -1,12 +1,6 @@
 
-import pymysql as db
 import pandas as pd
-import numpy as np
-
 import Charts as ch
-
-
-
 import numpy as np
 
 def payoffFunction(initialInv, investorShare, apprAnnualized, life, discount):
@@ -25,8 +19,26 @@ def payoffFunction(initialInv, investorShare, apprAnnualized, life, discount):
 
 #### GET DATA ####
 def getStuff():
-    query = 'select * from historical_data'
     df = pd.read_sql('select * from historical_data', connection)
     ch.plotHomePrices(df)
     return
+
+#### HOME PRICE PATH ###
+class HomePriceSimulation():
+    """ class to create and use a path of home prices"""
+    def __Init__(self, name, age):
+        self.name = name
+        self.age = age
+        self.size = (10000,10)
+        print("this is init function")
+    def generateFromFile(self, filename):
+        self.filename = filename
+        print("this is generate function")
+
+a = HomePriceSimulation()
+a.generateFromFile("dave.txt")
+
+
+
+
 
