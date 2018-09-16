@@ -6,6 +6,7 @@ import numpy as np
 
 #### Get CONNECTION ####
 def getConnection():
+
     connection = db.connect(user='analytics_user', password='sumdata', db='analytics', autocommit=True)
     cursor = connection.cursor()
     return cursor
@@ -80,20 +81,27 @@ for i in np.arange(1999,2017,1):
     masterDFOrig = readOrig(data_folder / origination_file_names[0])
 
 for i in np.arange(1,17):
+    print(origination_file_names[i])
     a = readOrig(data_folder / origination_file_names[i])
     masterDFOrig = masterDFOrig.append(a)
-    print(masterDFOrig.values.shape)
-masterDFOrig.to_csv(data_folder / "Orig_Master.txt")
 
-masterDFOrig.drop()
+    #masterDFOrig.values.to_csv(data_folder / "Orig_Master.txt")
 
-servicing_file_names = []
-for i in np.arange(1999,2017,1):
-    servicing_file_names.append('sample_svcg_'+ str(i) + '.txt')
-    masterDFSvcg = readSvcg(data_folder / servicing_file_names[0])
-for i in np.arange(1,17):
-    b = readSvcg(data_folder / servicing_file_names[i])
-    masterDFSvcg = masterDFSvcg.append(b)
-    print(masterDFSvcg.values.shape)
-masterDFSvcg.to_csv(data_folder / "Svcg_Master.txt")
+np.savetxt(data_folder / "Orig_Master.txt", masterDFOrig.values)
 
+#masterDFOrig.drop()
+
+# servicing_file_names = []
+# for i in np.arange(1999,2017,1):
+#     servicing_file_names.append('sample_svcg_'+ str(i) + '.txt')
+#     masterDFSvcg = readSvcg(data_folder / servicing_file_names[0])
+# for i in np.arange(1,17):
+#     b = readSvcg(data_folder / servicing_file_names[i])
+#     masterDFSvcg = masterDFSvcg.append(b)
+#     print(masterDFSvcg.values.shape)
+# masterDFSvcg.to_csv(data_folder / "Svcg_Master.txt")
+
+#### PLOT CASE SCHILLER DATA ####
+def getStuff():
+    df = pd.read_sql('select * from historical_data', connection)
+    ch.plotHomePrices(df)
