@@ -1,12 +1,13 @@
 # import pymysql as db
 # import pandas as pd
-#
-#
 # from pathlib import Path
-# from Utilities import bulkLoad
 # import Utilities
 # import Analytics
 import Charts as ch
+
+
+
+# PRODUCE ALL OF THE CHARTS
 
 ch.gridOfMultiplesAndDiscounts()
 
