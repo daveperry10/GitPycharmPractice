@@ -1,4 +1,8 @@
 
+import numpy as np
+import matplotlib.pyplot as plt
+from Analytics import payoffIRR
+
 def plotHomePrices(df):
     fig, ax1 = plt.subplots()
     ax1.set_xlabel('Year')
@@ -14,19 +18,14 @@ def plotHomePrices(df):
     plt.show()
     return 1
 
-import numpy as np
-import matplotlib.pyplot as plt
-from Analytics import payoffFunction
-
 ###############################################################################
 def gridOfMultiplesAndDiscounts():
     multiples = np.arange(.15,.45,.05)
     discounts = np.arange(0,.35,.05)
     matrix = np.zeros(shape=(multiples.shape[0],discounts.shape[0]))
-
     for i in range(multiples.shape[0]):
         for j in range(discounts.shape[0]):
-            matrix[i][j] = payoffFunction(.10,multiples[i],.04,6, discounts[j])
+            matrix[i][j] = payoffIRR(.10,multiples[i],.04,6, discounts[j])
 
     fig, ax = plt.subplots()
     ax.imshow(matrix)
@@ -54,4 +53,17 @@ def gridOfMultiplesAndDiscounts():
 
     fig.tight_layout
     plt.show()
+    return
+
+
+def gridOfIRR(df):
+    fig, ax = plt.subplots()
+    fig.set_size_inches(6,8)
+    ax.imshow(df.values)
+    ax.set_xticks(np.arange(len(df.columns))) ; ax.set_xticklabels(df.columns)
+    ax.set_yticks(np.arange(len(df.index))) ; ax.set_yticklabels(df.index)
+    for i in range(len(df.index)):
+        for j in range(len(df.columns)):
+            ax.text(j, i, "{:.0%}".format(df.iloc[i, j]), ha="center", va="center", color="w", fontsize = 7)
+    ax.set(xlabel='Age at Payback', ylabel='Vintage',title='IRR by Vintage, Age at Payback')
     return
