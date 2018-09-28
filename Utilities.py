@@ -18,9 +18,7 @@ def getConnection():
 
 def bulkLoad():
     #### READ CSV ####
-    data_folder = Path("C:/Users/Dave/Documents/Sum/Data")
-    file_to_open = data_folder / "HP Data 1890.csv"
-    df1 = pd.read_csv(file_to_open, index_col=0)
+
     # print(df1)
 
     #### INSERT ####
@@ -72,22 +70,22 @@ def readSvcg(file_to_open):  #returns a DataFrame
                                                                      'expenses','legal_costs', 'maint_pres_costs', 'tax_insu', 'misc_exp', 'actual loss',
                                                                      'mod_cost', 'step_mod_flag', 'def_pay_mod'])
 
+def idontknow():
+    data_folder = Path("C:/Users/Dave/Documents/Sum/Data/All Samples")
 
-data_folder = Path("C:/Users/Dave/Documents/Sum/Data/All Samples")
+    origination_file_names = []
+    for i in np.arange(1999,2017,1):
+        origination_file_names.append('sample_orig_'+ str(i) + '.txt')
+        masterDFOrig = readOrig(data_folder / origination_file_names[0])
 
-origination_file_names = []
-for i in np.arange(1999,2017,1):
-    origination_file_names.append('sample_orig_'+ str(i) + '.txt')
-    masterDFOrig = readOrig(data_folder / origination_file_names[0])
+    for i in np.arange(1,17):
+        print(origination_file_names[i])
+        a = readOrig(data_folder / origination_file_names[i])
+        masterDFOrig = masterDFOrig.append(a)
 
-for i in np.arange(1,17):
-    print(origination_file_names[i])
-    a = readOrig(data_folder / origination_file_names[i])
-    masterDFOrig = masterDFOrig.append(a)
+        #masterDFOrig.values.to_csv(data_folder / "Orig_Master.txt")
 
-    #masterDFOrig.values.to_csv(data_folder / "Orig_Master.txt")
-
-np.savetxt(data_folder / "Orig_Master.txt", masterDFOrig.values)
+    np.savetxt(data_folder / "Orig_Master.txt", masterDFOrig.values)
 
 #masterDFOrig.drop()
 

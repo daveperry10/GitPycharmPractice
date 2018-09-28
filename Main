@@ -1,16 +1,49 @@
-# import pymysql as db
-# import pandas as pd
-# from pathlib import Path
-# import Utilities
-# import Analytics
-import Charts as ch
+
+##################
+#
+#   Main Module for Chart Generator
+#
+##################
+
+import Setup as s
+import Charts as c
+import Analytics as a
+
+def main():
+
+    d = s.Data()                              #Initialize
+    d.getFreddieData()
+    #d.getMSAData()
+
+    # Schiller Plot
+    # c.plotCaseSchiller(d.getCaseSchillerData())
+
+    # Grid of Multiples and Discounts
+    # c.gridOfMultiplesAndDiscounts()
+
+    # Grid of IRR by Vintage/Age
+    #c.gridOfIRR(d, msa=10900, payoff_status='Defaulted')
+
+    # Histogram of Home Price Appreciation versus Payoff
+    #c.histAppreciationVsPayoff(d.getFreddieData(), msa=10900, vintage=1999, payoff_status='Paid Off')
 
 
+    ch = c.Chart(4,2, sharey = False)
+    ch.setTitle("Left: Successive Cuts of Total Appreciation.\n  Right: Annualized Payoff by LTV Ranges")
+    ch.setChartFileName("SampleChart")
+    # ch.histBasic(d.getFreddieData(), a.calcTotalAppreciation, (0, 0), title='Total Appreciation\n')
+    # ch.histBasic(d.getFreddieData(), a.calcTotalAppreciation, (1, 0), payoff_status='Paid Off', title='Total Appreciation\n')
+    # ch.histBasic(d.getFreddieData(), a.calcTotalAppreciation, (2, 0), payoff_status='Defaulted', vintage=2006, title='Total Appreciation\n')
+    # ch.histBasic(d.getFreddieData(), a.calcTotalAppreciation, (3, 0), payoff_status='Defaulted', vintage=2006, msa = 10900, title='Total Appreciation\n')
+    #
+    # ch.histBasic(d.getFreddieData(), a.calcAnnualizedPayoff, (0, 1), orig_oltv = (60,100), title='Annualized Payoff\n')
+    # ch.histBasic(d.getFreddieData(), a.calcAnnualizedPayoff, (1, 1), orig_oltv = (40,60), title='Annualized Payoff\n')
+    # ch.histBasic(d.getFreddieData(), a.calcAnnualizedPayoff, (2, 1), orig_oltv = (20,40), title='Annualized Payoff\n')
+    ch.histBasic(d.getFreddieData(), a.calcAnnualizedPayoff, (3, 1), orig_oltv = (0,20), title='Annualized Payoff\n')
+    ch.saveFig()
 
-# PRODUCE ALL OF THE CHARTS
-
-ch.gridOfMultiplesAndDiscounts()
+    return
 
 
-
+main()
 

@@ -1,10 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import pandas as pd
-import pymysql as db
-
-
+############################################################################
+#
+#   Payoff.py  Module for reports that generate monthly payoffs
+#
+############################################################################
 
 
 def plotMoneyBackByVintage(df, msa, yr):
@@ -52,6 +50,7 @@ def plotMoneyBackByVintage(df, msa, yr):
 ####################################
 #  TIMING OF CASH FLOW FOR ALL DATA
 ####################################
+
 def monthlyPayoffTiming(df, ax, **kwargs):
     yr = kwargs.get('yr', 'all')
     dollar = kwargs.get('dollar', True)
@@ -90,7 +89,7 @@ def monthlyPayoffTimingAllVintages():
     import pathlib
     df = s.getData()
     s.addCalulatedFields(df)
-    freddie_path = pathlib.Path("C:/Users/Dave/Documents/Sum/Data/")
+    freddie_path = pathlib.Path(OUTPUT_PATH)
     fig, axes = plt.subplots(2,1)
     fig.set_size_inches(7,9)
 
@@ -119,7 +118,7 @@ def monthlyPayoffTimingByVintage():
 
     df = s.getData()
     s.addCalulatedFields(df)
-    freddie_path = pathlib.Path("C:/Users/Dave/Documents/Sum/Data/")
+    freddie_path = pathlib.Path(OUTPUT_PATH)
 
     fig, axes = plt.subplots(5,2, sharex = True, sharey= True)
     fig.set_size_inches(7,9)
@@ -140,14 +139,6 @@ def monthlyPayoffTimingByVintage():
     fig.suptitle("Payoff by Termination Age")
     plt.show()
     return
-
-monthlyPayoffTimingByVintage()
-
-
-
-
-
-
 
 def returnsByVintageAndMSA(df, msa):
     x = df[df['MSA']==msa].pivot_table(['actualPayoff', 'investment','age'], ['vintage'])

@@ -1,62 +1,58 @@
-
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pymysql as db
+import pandas as pd
 
-####################
-#  Histograms of appreciation versus payoff
-####################
-def histogramsAppreciationPayoff():
 
-    df['appreciation'] = (df.last_home_price/df.orig_home_price) ** (1 / df.age_float) - 1
-    df['payoffPct'] = (df.actualPayoff / df.investment) ** (1 / df.age_float) - 1
 
-    #FILTERS
-    a = df[(df.appreciation < 5) & (df.appreciation > -5) & (df.payoffPct < 5) & (df.vintage < 2008) & (df.age > 2)]
+def calcAnnualizedAppreciation(row):
+    return (row['last_home_price'] / row['orig_home_price']) ** (1 / row['age_float']) - 1
 
-    #PLOTS
-    fig, axes = plt.subplots(2,1, sharex = True)
+def calcAnnualizedPayoff(row):
+    return (row['actualPayoff'] / row['investment']) ** (1 / row['age_float']) - 1
 
-    axes[0].set_title("Annualized Home Appreciation, Mean = " + str(a.appreciation.mean()))
-    axes[1].set_title("Annualized SOTW Return, Mean = " + str(a.payoffPct.mean()))
-    a.appreciation.hist(bins = 25, ax=axes[0])
-    a.payoffPct.hist(bins = 100, ax=axes[1])
-    return
+def calcTotalAppreciation(row):
+    return row['last_home_price'] / row['orig_home_price'] - 1
 
-##################
-#  Worms Chart
-##################
+def calcTotalPayoff(row):
+    return (row['actualPayoff'] / row['investment']) - 1
 
-def chartsMain():
+
+def chartsMain(msas):
     conn = db.connect(user='analytics_user', password='sumdata', db='analytics', autocommit=True)
     fig, axes = plt.subplots(5,2,figsize=(7,8), sharey=True)
-    pricebyMSA(conn, 10180, axes[0, 0]); pricebyMSA(conn, 10420, axes[1, 0])
-    pricebyMSA(conn, 10580, axes[2, 0]); pricebyMSA(conn, 10500, axes[3, 0])
-    pricebyMSA(conn, 10540, axes[4, 0]); pricebyMSA(conn, 10740, axes[0, 1])
-    pricebyMSA(conn, 10780, axes[1, 1]); pricebyMSA(conn, 10900, axes[2, 1])
-    pricebyMSA(conn, 11020, axes[3, 1]); pricebyMSA(conn, 11100, axes[4, 1])
+
+    msa = ""
+    # strlist = msa[0]
+    # for i in (1, msas.size):
+    #     strlist = strlist + "," + msas[i]
+
+
+    query = "SELECT place_name, yr, period, index_sa FROM fhfahpi WHERE yr > 1998 AND place_id in ( %s ) AND hpi_flavor " \
+            "= 'all-transactions' AND level = 'MSA'"
+    data = pd.read_sql(query, conn, params=[msa])
+
+    def pricebyMSA(connection, msa, ax):
+
+        wholedate = data["yr"].map(str) + ((data["period"]) * 3).map(str)
+        data.set_index(pd.DatetimeIndex(pd.to_datetime(wholedate, format='%Y%m')), inplace=True)
+        data.index_sa = 100 * data.index_sa / data.index_sa.iloc[0]
+        data.drop(columns=['yr', 'period'], inplace=True)
+        data.plot(legend=False, title=data.place_name.iloc[0], ax=ax)
+        return ax
+
+    pricebyMSA(conn, msa[0], axes[0, 0]); pricebyMSA(conn, msa[1], axes[1, 0])
+    pricebyMSA(conn, msa[2], axes[2, 0]); pricebyMSA(conn, msa[3], axes[3, 0])
+    pricebyMSA(conn, msa[4], axes[4, 0]); pricebyMSA(conn, msa[5], axes[0, 1])
+    pricebyMSA(conn, msa[6], axes[1, 1]); pricebyMSA(conn, msa[7], axes[2, 1])
+    pricebyMSA(conn, msa[8], axes[3, 1]); pricebyMSA(conn, msa[9], axes[4, 1])
     fig.tight_layout()
     plt.show()
     return 1
 
-##################
-#  Worms Chart
-##################
-def pricebyMSA(connection, msa, ax):
-    query = "SELECT place_name, yr, period, index_sa FROM fhfahpi WHERE yr > 1998 AND place_id = %s AND hpi_flavor " \
-            "= 'all-transactions' AND level = 'MSA'"
-    data = pd.read_sql(query, connection, params=[msa])
-    wholedate = data["yr"].map(str) + ((data["period"]) * 3).map(str)
-    data.set_index(pd.DatetimeIndex(pd.to_datetime(wholedate, format='%Y%m')),inplace=True)
-    data.index_sa = 100*data.index_sa/data.index_sa.iloc[0]
-    data.drop(columns = ['yr','period'], inplace=True)
-    data.plot(legend=False, title=data.place_name.iloc[0],ax=ax)
-    return ax
-#chartsMain()
-
-
-
+###
+#  maybe not needed anymore?
+##
 def moneyBackByVintage(df, yr):
     df['investment'] = df.orig_home_price * (0.1) * (0.9)
     df['expectedPayoff'] = (0.35) * (df.last_home_price - df.orig_home_price + (0.1) * df.orig_home_price) + \
