@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from Analytics import payoffIRR
 import Setup as s
 
-############################################
-#  Real and Nominal Home Prices
-############################################
+""" plotCaseSchiller (df)
+    - Single-use chart function
+    - Real and Nominal Home Prices, CPI """
 
-def plotCaseSchiller(df):
+def plotCaseSchiller(df):       #todo: re-write the datasource for this somewhere.
     fig, ax1 = plt.subplots()
     ax1.set_xlabel('Year')
     ax1.set_ylabel('Real Home Prices')
@@ -121,34 +121,29 @@ def gridOfIRR(d, **kwargs):
 
     return 1
 
-#######################################################
-#   Filter:  take in kwargs and return a filtered DF
-#######################################################
 
-def kwargFilter(df, titleStringList, **kwargs):
-    vintage = kwargs.get('vintage', 'all')
-    msa = kwargs.get('msa', 'all')
-    payoff_status = kwargs.get('payoff_status', 'all')
-    orig_oltv = kwargs.get('orig_oltv', 'all')
-    titlestring = ''
 
-    if msa != 'all':
-        filt = df[df['MSA'] == msa]
-        titlestring = " MSA = " + str(msa).title()
-    else:
-        filt = df
 
-    if vintage != 'all':
-        filt = filt[filt['vintage'] == vintage]
-        titlestring = titlestring + " Vintage = " + str(vintage).title()
+    # age = kwargs.get('age', 'all')
+    # if age != 'all':
+    #
+    #     titlestring = titlestring + " age in " + str(age).title()
+    #
+    # vintage = kwargs.get('vintage', 'all')
+    # if vintage != 'all':
+    #     filt = filt[filt['vintage'] == vintage]
+    #     titlestring = titlestring + " Vintage = " + str(vintage).title()
+    #
+    # payoff_status = kwargs.get('payoff_status', 'all')
+    # if payoff_status != 'all':
+    #     filt = filt[filt['payoff_status'] == payoff_status]
+    #     titlestring = titlestring + " Status = " + payoff_status
+    #
+    # orig_oltv = kwargs.get('orig_oltv', 'all')
+    # if orig_oltv != 'all':
+    #     filt = filt[filt['orig_oltv'].between(orig_oltv[0], orig_oltv[1], inclusive=True)]
+    #     titlestring = titlestring + " OLTV in (" + str(orig_oltv[0]) + "," + str(orig_oltv[1]) + ")"
 
-    if payoff_status != 'all':
-        filt = filt[filt['payoff_status'] == payoff_status]
-        titlestring = titlestring + " Status = " + payoff_status
-
-    if orig_oltv != 'all':
-        filt = filt[filt['orig_oltv'].between(orig_oltv[0],orig_oltv[1])]
-        titlestring = titlestring + " OLTV in (" + str(orig_oltv[0]) + "," + str(orig_oltv[1]) + ")"
 
     titleStringList[0] = titlestring
     return filt
@@ -194,7 +189,8 @@ def histAppreciationVsPayoff(df, **kwargs):
 class Chart():
     def __init__(self, rows, cols, **kwargs):
         sharey = kwargs.get('sharey', True)
-        self.fig, self.axes = plt.subplots(rows, cols, sharex=True, sharey=sharey)
+        sharex = kwargs.get('sharex', True)
+        self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
         plt.subplots_adjust(hspace = 0.3)
         self.fig.set_size_inches(7,9.5)
         self.title = ""
@@ -209,25 +205,107 @@ class Chart():
     def setChartFileName (self, s):
         self.chartfilename = s
 
-    def saveFig (self):
+    def save (self):
         self.fig.savefig(self.path / (self.chartfilename + '.png'))
 
-    def histBasic(self, df, func, loc , **kwargs):
-        if self.axes.ndim == 1:
-            ax = self.axes[loc[0]]
-        else:
-            ax = self.axes[loc[0], loc[1]]
 
-        axisTitle = kwargs.get('title', '')
+    """ kwargFilter:  
+        - Take in key word arguments and return a filtered DF
+        - If a key doesn't match in the list of column names, keep going (not all keywords are meant to be filters)
+    """
+
+    def kwargFilter(self, df, titleStringList, **kwargs):
+
+        titlestring = ''
+        filt = df
+
+        for k in kwargs.keys():
+            if k in df.columns:
+                if kwargs.get(k, 'all') != 'all':
+                    try:
+                        if type(kwargs[k]).__name__ == 'tuple':
+                            filt = filt[filt[k].between(kwargs[k][0], kwargs[k][1], inclusive=True)]
+                            titlestring = titlestring + " " + k + '=' + str(kwargs[k]).title()
+                        else:
+                            filt = filt[filt[k] == kwargs[k]]
+                            titlestring = titlestring + " " + k + '=' + str(kwargs[k]).title()
+                    except:
+                        print(kwargs[k] + ": invalid value")
+                        pass
+            else:
+                print(k + ": invalid filter.  use field names")
+
+        titleStringList[0] = titlestring
+        return filt
+
+    """ 
+    Histogram filtered on any database field
+    - kwargs: all DB fields
+    - loc: tuple specifying grid location                                
+    - func: any row-wise function on the DataFrame, used to create the 'measure' to be plotted 
+    """
+
+    def histBasic(self, df, func, loc , **kwargs):
+        ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+
+        binarg = kwargs.get('bins', 'default')
+        if binarg == 'default':
+            bins = np.arange(-1, 0.5, 0.02)
+        else:
+            bins = np.arange(binarg[0], binarg[1], binarg[2])
+
         titleStringList = pd.Series([''])
         filt = kwargFilter(df, titleStringList, **kwargs)
 
         filt['measure'] = df.apply(func, axis=1)
 
-        ax.set_title(axisTitle + titleStringList[0] + " Mean = " + str(round(filt.measure.mean(), 2)), fontsize=7)
-        filt = filt[(filt.measure < 5) & (filt.vintage < 2008) & (filt.age > 2)]
-        filt.measure.hist(bins=np.arange(-1, 0.5, 0.02), ax=ax)
+        ax.set_title(kwargs.get('title', '') + titleStringList[0] + " Mean = " + str(round(filt.measure.mean(), 2)), fontsize=7)
+
+        filt = filt[(filt.measure < 5) & (filt.vintage < 2008)]
+        filt.measure.hist(bins=bins, ax=ax)
+        print(ax.get_title())
         return
 
+    """ 
+    Line Chart for a pivot table, filtered on DB field. 
+        - kwargs (1) : all column name filters 
+        - kwargs (2): values = field_name, columns='field_name', rows='field_name'
+    """
+
+    def pivotBasic(self, df, loc, **kwargs):        # todo: make this take columns and multiple rows
+
+        ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+        titleStringList = pd.Series([''])
+        filt = self.kwargFilter(df, titleStringList, **kwargs)
+        ax.set_title(kwargs.get('title', '') + titleStringList[0], fontsize=7)
+
+        rows = kwargs.get('rows', 'age')
+        values = kwargs.get('values', 'actualPayoff')
+
+        piv = filt.pivot_table([values], [rows], aggfunc=sum).ix[:, :9]
+        piv[values].plot(kind='line', ax=ax)
+
+        return
+
+
+    def ageBasic(self, df, loc, **kwargs):
+
+        ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+        titleStringList = pd.Series([''])
+        filt = kwargFilter(df, titleStringList, **kwargs)
+        ax.set_title(kwargs.get('title', '') + titleStringList[0], fontsize=7)
+
+        if kwargs.get('byyear', True):
+            piv = filt.pivot_table(['actualPayoff'], ['age'], aggfunc=sum).ix[:, :9]
+        else:
+            piv = filt.pivot_table(['actualPayoff'], ['age_float'], aggfunc=sum).ix[:, :9]
+
+        if kwargs.get('pct', True):
+            (piv / piv.sum())[['actualPayoff']].mean(axis=1).plot(kind='line', ax=ax)
+            (piv / piv.sum())[['actualPayoff']].mean(axis=1).cumsum().plot(kind='line', ax=ax, secondary_y=True)
+        else:
+            (piv[['actualPayoff']].mean(axis=1) * 100).plot(kind='line', ax=ax)
+            (piv[['actualPayoff']].mean(axis=1) * 100).cumsum().plot(kind='line', ax=ax, secondary_y=True)
+        print(ax.get_title())
 
 

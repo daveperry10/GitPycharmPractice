@@ -4,6 +4,10 @@
 #
 ############################################################################
 
+import Setup as s
+import pathlib
+import matplotlib.pyplot as plt
+import numpy as np
 
 def plotMoneyBackByVintage(df, msa, yr):
     import matplotlib.pyplot as plt
@@ -47,6 +51,8 @@ def plotMoneyBackByVintage(df, msa, yr):
 
     return
 
+
+
 ####################################
 #  TIMING OF CASH FLOW FOR ALL DATA
 ####################################
@@ -58,6 +64,8 @@ def monthlyPayoffTiming(df, ax, **kwargs):
 
     filt = df[df['vintage'] == yr] if yr != 'all' else df
     filt = filt[filt['MSA'] == msa] if msa != 'all' else filt
+
+    filt[filt['age_float']<18].actualPayoff = 0
 
     bb = filt.pivot_table(['actualPayoff'], ['age_float'], aggfunc=sum).ix[:,:9]
     bb_inv = filt.pivot_table(['investment'], ['age_float'], aggfunc=sum).ix[:, :9]
@@ -72,16 +80,70 @@ def monthlyPayoffTiming(df, ax, **kwargs):
         payoffPctMeans = (bb / bb.sum())[['actualPayoff']].mean(axis=1)
         (payoffPctMeans * 100).plot(kind='line', ax=ax)
 
-        InvestedPctsMeans = (bb_inv / bb_inv.sum())[['investment']].mean(axis=1)
-        (InvestedPctsMeans * 100).plot(kind='line', ax=ax)
+       # InvestedPctsMeans = (bb_inv / bb_inv.sum())[['investment']].mean(axis=1)
+       # (InvestedPctsMeans * 100).plot(kind='line', ax=ax)
 
         avl = np.round((payoffPctMeans.index * payoffPctMeans).sum(), 2)
 
         ax.set_title("% Flows: Vint: " + str(yr).title() + ", MSA: "+ str(msa).title() + ", TR=" + \
                      str(round(bb.sum().sum()/bb_inv.sum().sum()-1,2))  + ", Avl=" + str(avl))
-
-
         return payoffPctMeans
+
+def monthlyPayoffTimingByVintage():
+
+    d = s.Data()
+    df = d.getFreddieData()
+    freddie_path = pathlib.Path(s.OUTPUT_PATH)
+
+    fig, axes = plt.subplots(5,2, sharex = True, sharey= True)
+    fig.set_size_inches(7,9)
+    for v in range(1999, 2004):
+        ax = axes[v-1999,0]
+        dd = monthlyPayoffTiming(df, ax, yr=v, dollar=False, msa = 'all')
+        dd.to_csv(freddie_path / (str(v) + ".csv"))
+        ax.set_xlabel("Age", fontsize=7)
+        ax.set_title(ax.title._text, fontsize=7)
+
+    for v in range(2004, 2009):
+        ax = axes[v-2004,1]
+        dd = monthlyPayoffTiming(df, ax, yr=v, dollar=False, msa = 'all')
+        dd.to_csv(freddie_path / (str(v) + ".csv"))
+        ax.set_xlabel("Age", fontsize = 7)
+        ax.set_title(ax.title._text, fontsize=7)
+    plt.subplots_adjust(hspace=0.25)
+    fig.suptitle("Payoff by Termination Age")
+    plt.show()
+    fig.savefig(freddie_path/ ("Payoff by Termination Age" + '.png'))
+    return
+
+monthlyPayoffTimingByVintage()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def monthlyPayoffTimingAllVintages():
     import matplotlib.ticker as t
@@ -112,33 +174,8 @@ def monthlyPayoffTimingAllVintages():
 
 
 
-def monthlyPayoffTimingByVintage():
-    import Setup as s
-    import pathlib
 
-    df = s.getData()
-    s.addCalulatedFields(df)
-    freddie_path = pathlib.Path(OUTPUT_PATH)
 
-    fig, axes = plt.subplots(5,2, sharex = True, sharey= True)
-    fig.set_size_inches(7,9)
-    for v in range(1999, 2004):
-        ax = axes[v-1999,0]
-        dd = monthlyPayoffTiming(df, ax, yr=v, dollar=False, msa=10900)
-        dd.to_csv(freddie_path / (str(v) + ".csv"))
-        ax.set_xlabel("Age", fontsize=7)
-        ax.set_title(ax.title._text, fontsize=7)
-
-    for v in range(2004, 2009):
-        ax = axes[v-2004,1]
-        dd = monthlyPayoffTiming(df, ax, yr=v, dollar=False, msa=10900)
-        dd.to_csv(freddie_path / (str(v) + ".csv"))
-        ax.set_xlabel("Age", fontsize = 7)
-        ax.set_title(ax.title._text, fontsize=7)
-    plt.subplots_adjust(hspace=0.25)
-    fig.suptitle("Payoff by Termination Age")
-    plt.show()
-    return
 
 def returnsByVintageAndMSA(df, msa):
     x = df[df['MSA']==msa].pivot_table(['actualPayoff', 'investment','age'], ['vintage'])

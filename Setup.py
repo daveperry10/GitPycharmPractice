@@ -15,12 +15,18 @@ SOTW_BLUE = (0 / 256, 186 / 256, 241 / 256, 1)
 SOTW_RED = (241 / 256, 89 / 256, 41 / 256, 1)
 SOTW_YELLOW = (252 / 256, 184 / 256, 37 / 256, 1)
 
+FIELD_LIST = ['credit_score', 'orig_CLTV', 'orig_DTI', 'orig_int_rate', 'prop_type', 'loan_purpose',
+              'orig_loan_term',
+              'num_units', 'num_borrowers', 'chan', 'vintage', 'loan_id', 'orig_upb', 'orig_oltv', 'payoff_status',
+              'age', 'age_float', 'last_upb', 'orig_home_price', 'last_home_price', 'msa']
+
 class Data():
 
     def __init__(self):
         self.connection = db.connect(user='analytics_user', password='sumdata', db='analytics', autocommit=True)
         self.msaMap = pd.DataFrame()
         self.freddieData = pd.DataFrame()
+        self.freddieDataLarge = pd.DataFrame()
         self.msaPriceHistory = pd.DataFrame()
         self.caseSchillerData = pd.DataFrame()
 
@@ -29,6 +35,12 @@ class Data():
             self.freddieData = pd.read_sql('select * from lhp', self.connection)
             self.addCalulatedFields(self.freddieData)
         return self.freddieData
+
+    def getFreddieDataLarge(self):
+        if self.freddieDataLarge.empty:
+            self.freddieDataLarge = pd.read_sql('select * from lhp_large', self.connection)
+            self.addCalulatedFields(self.freddieDataLarge)
+        return self.freddieDataLarge
 
     def getMSAData(self):
         if self.msaPriceHistory.empty:
