@@ -1,8 +1,7 @@
-############################################################################
-#
-#   Payoff.py  Module for reports that generate monthly payoffs
-#
-############################################################################
+"""
+Module for reports that generate monthly payoffs
+    -to be replaced by or moved into charts.py
+"""
 
 import Setup as s
 import pathlib
@@ -92,7 +91,7 @@ def monthlyPayoffTiming(df, ax, **kwargs):
 def monthlyPayoffTimingByVintage():
 
     d = s.Data()
-    df = d.getFreddieData()
+    df = d.getFreddieData
     freddie_path = pathlib.Path(s.OUTPUT_PATH)
 
     fig, axes = plt.subplots(5,2, sharex = True, sharey= True)

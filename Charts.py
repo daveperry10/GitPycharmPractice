@@ -1,14 +1,27 @@
+"""
+Charts Module:
+- One-off charts built from various sources
+- Built on pandas DataFrame and matplotlib charts
+- Top level database view called with a simple 'select * from ___'
+
+- class Charts(): generic charting functions that filter based on key word arguments
+"""
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from Analytics import payoffIRR
 import Setup as s
 
-""" plotCaseSchiller (df)
-    - Single-use chart function
-    - Real and Nominal Home Prices, CPI """
+def plotCaseSchiller(df):
 
-def plotCaseSchiller(df):       #todo: re-write the datasource for this somewhere.
+    """ Real and Nominal Home Prices, CPI Chart
+    - Single-use chart function
+
+    """
+
+    # todo: re-write the data source for this somewhere.
+
     fig, ax1 = plt.subplots()
     ax1.set_xlabel('Year')
     ax1.set_ylabel('Real Home Prices')
@@ -30,11 +43,14 @@ def plotCaseSchiller(df):       #todo: re-write the datasource for this somewher
     df.to_csv(s.OUTPUT_PATH / "Historical Home Prices (Schiller).csv")
     return 1
 
-############################################
-#  Grid of Multiples and Discounts
-############################################
+
 
 def gridOfMultiplesAndDiscounts():
+
+    ''' Heat Map for SOTW contract parameter values
+    - Single-use chart function
+    '''
+
     multiples = np.arange(.15,.45,.05)
     discounts = np.arange(0,.35,.05)
     matrix = np.zeros(shape=(multiples.shape[0],discounts.shape[0]))
@@ -64,20 +80,20 @@ def gridOfMultiplesAndDiscounts():
             ax.text(i, j, "{:.1%}".format(matrix[i, j]), ha="center", va="center", color="w")
 
     ax.set(xlabel='Multiple', ylabel='Discount',title='IRR by Investor Multiple and Discount')
-    # ax.xaxis.set_major_formatter(plt.FuncFormatter('{0:.2f}%'.format))
-    # ax.yaxis.set_major_formatter(plt.FuncFormatter('{0:.2f}%'.format))
-
-    fig.tight_layout
 
     fig.savefig(s.OUTPUT_PATH / "Grid of Multiples and Discounts.png")
     pd.DataFrame(matrix, index=xlables, columns = ylables).T.to_csv(s.OUTPUT_PATH / "Grid of Multiples and Discounts.csv")
     return
 
-#####################
-#    This is missing it's caller.  IT's a pivot of IRR by vintage and age.
-#####################
 
 def gridOfIRR(d, **kwargs):
+
+    """ Heat Map of IRR by age and vintage
+    - kwargs: any column name as filter
+    - pivot of IRR by vintage and age
+    """
+
+    # todo: This is missing it's caller
 
     if d.freddieData.empty:
         print("No Freddie data")
@@ -119,39 +135,15 @@ def gridOfIRR(d, **kwargs):
     bb.to_csv(s.OUTPUT_PATH / ('Grid of IRR -  MSA ' + titleStringList[0] + '.csv'))
     plt.show()
 
-    return 1
+    #titleStringList[0] = titlestring
 
 
 
-
-    # age = kwargs.get('age', 'all')
-    # if age != 'all':
-    #
-    #     titlestring = titlestring + " age in " + str(age).title()
-    #
-    # vintage = kwargs.get('vintage', 'all')
-    # if vintage != 'all':
-    #     filt = filt[filt['vintage'] == vintage]
-    #     titlestring = titlestring + " Vintage = " + str(vintage).title()
-    #
-    # payoff_status = kwargs.get('payoff_status', 'all')
-    # if payoff_status != 'all':
-    #     filt = filt[filt['payoff_status'] == payoff_status]
-    #     titlestring = titlestring + " Status = " + payoff_status
-    #
-    # orig_oltv = kwargs.get('orig_oltv', 'all')
-    # if orig_oltv != 'all':
-    #     filt = filt[filt['orig_oltv'].between(orig_oltv[0], orig_oltv[1], inclusive=True)]
-    #     titlestring = titlestring + " OLTV in (" + str(orig_oltv[0]) + "," + str(orig_oltv[1]) + ")"
-
-
-    titleStringList[0] = titlestring
-    return filt
-
-############################################
-#  Histograms of appreciation versus payoff
-############################################
 def histAppreciationVsPayoff(df, **kwargs):
+
+    """ Not Needed -- replaced by histBasic() """
+    # todo: delete
+
     titleStringList = pd.Series([''])
     filt = kwargFilter(df, titleStringList, **kwargs)
 
@@ -181,12 +173,14 @@ def histAppreciationVsPayoff(df, **kwargs):
     filt[['loan_id', 'appreciation', 'payoffPct']].to_csv(s.OUTPUT_PATH / ('Hist of Appreciation vs Payoff' + titleStringList[0] +'.csv'))
     return
 
-#################################################################################################
-# Chart
-# Basic Histogram for including in grids.  Appreciation ('appreciation' or 'payoff') by any cut.
-#################################################################################################
-
 class Chart():
+
+    """ Chart Class:
+    - Methods to fill up chart grids with any kind of filter or attribute
+    - Built on pandas DataFrame and matplotlib charts
+    - Top level database view called with a simple 'select * from ___'
+    """
+
     def __init__(self, rows, cols, **kwargs):
         sharey = kwargs.get('sharey', True)
         sharex = kwargs.get('sharex', True)
@@ -208,13 +202,12 @@ class Chart():
     def save (self):
         self.fig.savefig(self.path / (self.chartfilename + '.png'))
 
+    def kwargFilter(self, df, titleStringList, **kwargs):
 
-    """ kwargFilter:  
+        """ kwargFilter:
         - Take in key word arguments and return a filtered DF
         - If a key doesn't match in the list of column names, keep going (not all keywords are meant to be filters)
-    """
-
-    def kwargFilter(self, df, titleStringList, **kwargs):
+        """
 
         titlestring = ''
         filt = df
@@ -238,14 +231,15 @@ class Chart():
         titleStringList[0] = titlestring
         return filt
 
-    """ 
-    Histogram filtered on any database field
-    - kwargs: all DB fields
-    - loc: tuple specifying grid location                                
-    - func: any row-wise function on the DataFrame, used to create the 'measure' to be plotted 
-    """
 
     def histBasic(self, df, func, loc , **kwargs):
+
+        """ Histogram filtered on any database field
+        - kwargs: all DB fields
+        - loc: tuple specifying grid location
+        - func: any row-wise function on the DataFrame, used to create the 'measure' to be plotted
+        """
+
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
 
         binarg = kwargs.get('bins', 'default')
@@ -255,7 +249,7 @@ class Chart():
             bins = np.arange(binarg[0], binarg[1], binarg[2])
 
         titleStringList = pd.Series([''])
-        filt = kwargFilter(df, titleStringList, **kwargs)
+        filt = self.kwargFilter(df, titleStringList, **kwargs)
 
         filt['measure'] = df.apply(func, axis=1)
 
@@ -266,13 +260,13 @@ class Chart():
         print(ax.get_title())
         return
 
-    """ 
-    Line Chart for a pivot table, filtered on DB field. 
-        - kwargs (1) : all column name filters 
-        - kwargs (2): values = field_name, columns='field_name', rows='field_name'
-    """
 
     def pivotBasic(self, df, loc, **kwargs):        # todo: make this take columns and multiple rows
+
+        """ Line Chart for a pivot table, filtered on DB field.
+        - kwargs (1): any column name filter
+        - kwargs (2): values = field_name, columns='field_name', rows='field_name'
+        """
 
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
         titleStringList = pd.Series([''])
@@ -289,6 +283,12 @@ class Chart():
 
 
     def ageBasic(self, df, loc, **kwargs):
+
+        """ Line Chart for a pivot table, filtered on DB field.
+        - kwargs (1): any column name to be used as a df filter
+        - kwargs (2): 'title', 'byyear', 'pct'
+        """
+        # todo: expand pivotBasic to do cumsum and percent of total, and then remove this
 
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
         titleStringList = pd.Series([''])
@@ -307,5 +307,3 @@ class Chart():
             (piv[['actualPayoff']].mean(axis=1) * 100).plot(kind='line', ax=ax)
             (piv[['actualPayoff']].mean(axis=1) * 100).cumsum().plot(kind='line', ax=ax, secondary_y=True)
         print(ax.get_title())
-
-

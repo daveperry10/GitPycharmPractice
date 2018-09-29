@@ -1,9 +1,12 @@
 
-##################
-#
-#   Main Module for Chart Generator
-#
-##################
+"""
+    Call everything from here.  Get the data, initialize a chart grid of any size, and load it up with charts
+    - Code clusters are self-documenting. Caller can:
+        - Caller can add a title to the figure
+        - Caller can add titles to each component chart in the figure
+        - Arguments are almost all function names, grid positions, and key-word args.
+
+"""
 
 import Setup as s
 import Charts as c
@@ -11,8 +14,8 @@ import Analytics as a
 
 def main():
 
-    d = s.Data()                              #Initialize
-    d.getFreddieData()
+    d = s.Data()
+    d.getFreddieData
     #d.getMSAData()
 
     # Schiller Plot
@@ -26,6 +29,19 @@ def main():
 
     # Histogram of Home Price Appreciation versus Payoff
     #c.histAppreciationVsPayoff(d.getFreddieData(), msa=10900, vintage=1999, payoff_status='Paid Off')
+
+
+
+    # ch = c.Chart(2,2, sharey = False, sharex = True)
+    # ch.setChartFileName("Repeat1")
+    # ch.setTitle("Total Appreciation")
+    # ch.histBasic(d.getFreddieData, a.calcTotalAppreciation, (0, 0), vintage=1999, age=4)
+    # ch.histBasic(d.getFreddieData, a.calcTotalAppreciation, (0, 1), vintage=1999, age=7)
+    # ch.histBasic(d.getFreddieData, a.calcTotalAppreciation, (1, 0), vintage=2005, age=4)
+    # ch.histBasic(d.getFreddieData, a.calcTotalAppreciation, (1, 1), vintage=2005, age=7)
+    # ch.save()
+
+    d = a.payoffIRR(initialInv, investorShare, apprAnnualized, life, discount)
 
 
     # ch1 = c.Chart(4,1, sharey = False)
@@ -75,12 +91,12 @@ def main():
     # ch4.ageBasic(d.getFreddieData(), (3, 0), pct=True, byyear=True, title='Default Curve\n', payoff_status='Defaulted', vintage=2006)
     # ch4.save()
 
-    ch5 = c.Chart(2,1, sharex=False, sharey=False)
-    ch5.setChartFileName("test kwarg")
-    ch5.setTitle("testPivot")
-    ch5.pivotBasic(d.getFreddieData(), (0, 0), age=(2, 10), rows='age', values='ret', vintage=2006, title="Returns by Age")
-    ch5.pivotBasic(d.getFreddieData(), (1, 0), rows='vintage', values='ret', title="Returns by Vintage")
-    ch5.save()
+    # ch5 = c.Chart(2,1, sharex=False, sharey=False)
+    # ch5.setChartFileName("test kwarg")
+    # ch5.setTitle("testPivot")
+    # ch5.pivotBasic(d.getFreddieData(), (0, 0), age=(2, 10), rows='age', values='ret', vintage=2006, title="Returns by Age")
+    # ch5.pivotBasic(d.getFreddieData(), (1, 0), rows='vintage', values='ret', title="Returns by Vintage")
+    # ch5.save()
 
     return
 

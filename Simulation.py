@@ -1,7 +1,6 @@
-
-######################################################################################################
-# Class Simulation
-######################################################################################################
+"""
+    Simultaion: Unfinished
+"""
 
 class Sim():
 
@@ -21,12 +20,14 @@ class Sim():
         axes[1].set_title("Home Sale Rate: 2% per month (10,000 Sims)")
 
 
-    ######################################################################################################
-    # buildRandomPrices(ROWS)
-    # Correlation X1 and X2 are random normal.  X3 = rX1 + sqrt(1-r^2)*X2  || Autocorr:  use previous xi as X1
-    ######################################################################################################
+
 
     def buildRandomPrices(ROWS):
+
+    """"
+    Correlation X1 and X2 are random normal.  X3 = rX1 + sqrt(1-r^2)*X2  || Autocorr:  use previous xi as X1
+    """
+
         monthlyExpectedReturn = 0.03/12
         monthlyVol = 0.05 / math.sqrt(12)
         rho = .60

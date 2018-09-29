@@ -87,6 +87,10 @@ def payoffDollars(initInvestmentPct, investorShare, origValue, newValue, discoun
 
 
 def payoffIRR(initialInv, investorShare, apprAnnualized, life, discount):
+    """
+    - nothing to see here
+
+    """
     discountedInitialInv = initialInv * (1-discount)
     newHomeValue = ((1+apprAnnualized)**life)
     appreciationTotal = newHomeValue+discount-1
