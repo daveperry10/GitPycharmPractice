@@ -57,6 +57,12 @@ def plotMoneyBackByVintage(df, msa, yr):
 ####################################
 
 def monthlyPayoffTiming(df, ax, **kwargs):
+    """
+    :param df: freddie view
+    :param ax: chart position
+    :param kwargs: vintage or msa
+    :return: flows as pct of total
+    """
     yr = kwargs.get('yr', 'all')
     dollar = kwargs.get('dollar', True)
     msa = kwargs.get('msa', 'all')
@@ -86,6 +92,9 @@ def monthlyPayoffTiming(df, ax, **kwargs):
 
         ax.set_title("% Flows: Vint: " + str(yr).title() + ", MSA: "+ str(msa).title() + ", TR=" + \
                      str(round(bb.sum().sum()/bb_inv.sum().sum()-1,2))  + ", Avl=" + str(avl))
+
+        payoffPctMeans.to_csv(pathlib.Path(s.OUTPUT_PATH)/ (str(yr) + ".csv"))
+
         return payoffPctMeans
 
 def monthlyPayoffTimingByVintage():
@@ -115,7 +124,6 @@ def monthlyPayoffTimingByVintage():
     fig.savefig(freddie_path/ ("Payoff by Termination Age" + '.png'))
     return
 
-monthlyPayoffTimingByVintage()
 
 
 

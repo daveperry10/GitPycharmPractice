@@ -1,9 +1,13 @@
 """
-    Simultaion: Unfinished
+    Simulation: Unfinished
+
 """
 import numpy as np
 import math
 import pandas as pd
+import pathlib
+import matplotlib.pyplot as plt
+import Analytics as a
 
 class Sim():
 
@@ -44,101 +48,148 @@ class Sim():
         for i in range(1, numRows):
             HPA[i] = rho * HPA[i-1] + (math.sqrt(1-rho**2)) * N[i]
             homePrices[i] = homePrices[i-1] * (1 + HPA[i])
+        return 1
 
-
-
-    def buildMeanReverting(self, numRows):
+    def buildMeanReverting(self, numTrials):
 
         """
-        Model mean reverting process for real home prices.
-        Add result to a constantly increasing inflation rate.
+        Models mean reverting process for real home prices.
+        Based on simplified "O-U" (Ornstein-Uhlenbeck) process, but using mu[t] instead of constant mu
+        for the anchor.
         """
 
-        lam = 16
-        mu = 0
-        sig = 0.05 / 12
-        # time increment is 1 month
+        mu = 100 * (1 + 0.04 / 12) ** np.arange(0, 120)
+        lam = .04
+        sig = 5  # working parameters were sig = 5, lam = .04, S[0] = 100, mu = 100 incr at 2%/yr
+        S = pd.Series(np.zeros(120))
+        S[0] = 100
+        df = pd.DataFrame(np.zeros(shape=(numTrials, 120)))
+        np.random.seed(0)
 
-        N = np.random.normal(0, 1, numRows)
-        S = pd.Series(np.zeros(numRows))
-        S[0]=100
-        for t in range(1, numRows):
-            S[t] = np.exp(-lam) * S[t-1] + (1 - np.exp(-lam) * mu) + sig *np.sqrt((1-np.exp(-2*lam)/2*lam))*N[t]
+        for i in range(0, numTrials):
+            N = np.random.normal(0, 1, 120)
+            for t in range(1, 120):
+                N = np.random.normal(0, 1, 120)
+                S[t] = S[t - 1] + lam * (mu[t] - S[t - 1]) + sig * N[t]
+            df.iloc[i, :] = S
+        return df/S[0]
 
 
+    def prepareSimulation(self, numTrials):
 
+        """Get the data, run the sim, do the plots"""
 
-    def HoldingsMatrix():
-        #####  Holdings Matrix  ########
-        # Matrices
-        # 1.    Payment Matrix --     PP (%)
-        # 2.    Holdings Matrix --    HD ($)
-        # 3.    Cash Flow Matrix --   CF ($)
-        # 4.    P&L Matrix --         PL ($)
-        # 5.    Appreciation --       AP (%)
-        #
-        # Input Vectors
-        # 1.    Payment Vector        pp (%, cum)
-        # 2.    Prices Vector         px (%)
+        dfPricePaths = self.buildMeanReverting(numTrials)
+        freddieFile = pathlib.Path("C:/Users/Dave/Documents/Sum/Analytics/Data/all.csv")
+        prepaymentsByMonth = pd.read_csv(freddieFile, header=None)
+        prepaymentCurve = prepaymentsByMonth.iloc[:, 1].cumsum()
+        navPaths = pd.DataFrame(np.zeros(shape=(120,numTrials)))
 
-        # Output:   NAV over time with reinvestment
-        #           Cash Flow over time
-        #           Simulation with price paths in matrix
+        for i in range(0,numTrials):
+            navPath = self.runSimulation(dfPricePaths.iloc[i,:], prepaymentCurve)
+            navPaths.iloc[:, i] = navPath
 
-        LIFE = 10
-        PERIODS = 30
+        fig, axes = plt.subplots(2, 1, sharex=False, sharey=False)
+        navPaths.iloc[:119,:].plot(ax=axes[0], legend=False)
+        dfPricePaths.T.plot(ax=axes[1], legend=False)
+        plt.show()
+        return
+
+    def runSimulation(self, pricePath, prepayCurve):
+
+        """ Build up the holdings and cashflows.  Handle reinvestments with matrix approach (Time x Vintage).
+        1.    Payment Matrix --     PP (%)
+        2.    Holdings Matrix --    HD ($)
+        3.    Cash Flow Matrix --   CF ($)
+        4.    P&L Matrix --         PL ($)
+        5.    Appreciation --       AP (%)
+        6.    Payoff --             PO (%)
+
+        Input Vectors  (using math convention of lowercase for vectors, uppercase for matrices
+        1.    Payment Vector        pp (%, cum)
+        2.    Prices Vector         px (%)
+
+        Output:   NAV over time with reinvestment
+                  Cash Flow over time
+                  Simulation with price paths in matrix
+        """
+
+        LIFE = 120
+        PERIODS = 120
         ROWS = LIFE + PERIODS
         COLUMNS = PERIODS
 
-        PP = np.ones(shape=(ROWS, COLUMNS)); HD = np.zeros(shape=(ROWS, COLUMNS)); CF = np.zeros(shape=(ROWS, COLUMNS))
-        PL = np.zeros(shape=(ROWS, COLUMNS)); NV = np.zeros(shape=(ROWS, COLUMNS)); AP = np.zeros(shape=(ROWS, COLUMNS))
-
-        freddie_file = pathlib.Path("C:/Users/Dave/Documents/Sum/Data/monthly_prepayment_freddie.csv")
-        ppDF = pd.read_csv(freddie_file, header=None)
-        pp = ppDF.iloc[:, 1].cumsum()
-        #pp = [.08, .18, .3, .45, .6, .7, .8, .85, .9, 1]  # marginals = [.08, .1, .12, .15, .15, .10, .10, .05, .05, .10]
-        px = buildRandomPrices(ROWS)
+        PP = np.ones(shape=(ROWS, COLUMNS))
+        HD = np.zeros(shape=(ROWS, COLUMNS))
+        CF = np.zeros(shape=(ROWS, COLUMNS))
+        PL = np.zeros(shape=(ROWS, COLUMNS))
+        NV = np.zeros(shape=(ROWS, COLUMNS))
+        AP = np.zeros(shape=(ROWS, COLUMNS))
+        PO = np.zeros(shape=(ROWS, COLUMNS))
+        HD_check = np.zeros(shape=(ROWS, COLUMNS))
 
         #BUILD PREPAY MATRIX
         for i in range(0,PERIODS):
-            PP[i + 1: i + LIFE + 1, i] = pp
+            PP[i + 1: i + LIFE + 1, i] = prepayCurve
 
-        #BUILD HOLDINGS MATRIX
+        #APPRECIATION = PRICE DIFFERENCE FROM TIME OF PURCHASE TO TIME OF EVALUATION:
+        for i in range(0,PERIODS-1):
+            for j in range(max(i-LIFE + 1, 0), i):
+                AP[i, j] = (pricePath[i]/pricePath[j]-1) if ((i >= j) & (i-j < LIFE + 1)) else 0
+                xxxxx = a.payoffPct(.1,.35,pricePath[j], pricePath[i],.1)
+                PO[i, j] = (pricePath[j] * xxxxx) if ((i >= j) & (i-j < LIFE + 1)) else 0
+                #print(AP[i, j], PO[i, j])
+
+
+        #BUILD MATRIX of original contract amounts by vintage and date.
+
+            # the HD[i,j] j!=i are the remaining balances of vintage j in period i
+            # The HD[j,j] are the initial amount for a vintage.
+            # it is the "sum product" (dot product) of the payoffs and the prepays that year
+            # (which are in invested amount units) for that row.
+            # now you have holdings that are increasing in total amount over time as profits are
+            # returned for reinvestment
+
+        HD_check[0, 0] = 1000000      # HD is just a debug check to make sure the rows sum to 1MM
         HD[0, 0] = 1000000
+
         for i in range(1, ROWS):
-            for j in range(0,min(COLUMNS-1,i)):
-                   HD[i,j] = np.round(HD[j,j] * (1-PP[i,j]),0)
+            for j in range(0, min(COLUMNS-1, i)):
+                HD_check[i, j] = np.round(HD_check[j, j] * (1-PP[i, j]), 0)
+                HD[i, j] = np.round(HD[j, j] * (1-PP[i, j]), 0)
+
             if (i<COLUMNS):
-                HD[i,i] = np.round((HD[i-1,:] - HD[i,:]).sum(),0)
+                HD_check[i,i] = np.round((HD_check[i-1,:] - HD_check[i, :]).sum(), 0)
+                xx = np.round(HD[i - 1, :] - HD[i, :], 0)
+                yy = PO[i,:]
+                HD[i, i] = np.dot(xx, yy)
 
-        #GET PORTFOLIO HOLDINGS BY AGE OVER TIME.  J-I IS THE AGE.
-        # ages = pd.DataFrame(np.zeros(shape=(10, 100)))
-        # for j in range(0,90):
-        #     for i in range(max(j-9,0),j+1):
-        #         ages.iloc[j-i,j] = HD[j,i]
 
+        # #GET CASH FLOW MATRIX OUT OF HOLDINGS MATRIX - THIS IS INVESTED AMOUNTS COMING DUE
+        # for i in range(1, PERIODS):
+        #     CF[i] = HD[i - 1, :] - HD[i, :]
+        # CF = CF.clip(min=0)   # clip syntax is different for ndarray
+        # PL = np.round(CF*AP,0)
+
+        #NET ASSET VALUE
+        NV = np.round(PO * HD)
+        nav = NV.sum(axis=1)[:PERIODS]
+        nav[0] = 1000000
+        return pd.Series(nav)
+
+    def getPortfolioHoldingsByAge(self, LIFE, PERIODS, HD):
+        """simple, chartable MxN sequence of portfolio proportions by loan age over time"""
+        ages = pd.DataFrame(np.zeros(shape=(10, 100)))
         ages = np.zeros(shape=(LIFE, PERIODS))
         for j in range(0, PERIODS):
             for i in range(max(j-LIFE +1,0), j+1):
                 ages[j-i,j] = HD[j,i]
 
-        #GET CASH FLOW MATRIX OUT OF HOLDINGS MATRIX - THIS IS INVESTED AMOUNTS COMING DUE
-        #CF = pd.DataFrame([HD[i - 1, :] - HD[i, :] for i in range(1, 100)]).clip(lower=0) #works but starts at zero
-        for i in range(1, PERIODS):
-            CF[i] = HD[i - 1, :] - HD[i, :]
-        CF = CF.clip(min=0)   # clip syntax is different for ndarray
-
-        #APPRECIATION = PRICE DIFFERENCE FROM TIME OF PURCHASE TO TIME OF EVALUATION:
-        for i in range(0,PERIODS-1):
-            for j in range(max(i-LIFE + 1, 0), i):
-                AP[i, j] = (px[i]-px[j]) if ((i >= j) & (i-j < LIFE + 1)) else 0
-
-        #REALIZED P&L
-        PL = np.round(CF*AP,0)
-
-        #NET ASSET VALUE
-        NV = np.round((AP + 1) * HD)
-        nav = NV.sum(axis=1)[:PERIODS]
+        for j in range(0,90):
+            for i in range(max(j-9,0),j+1):
+                ages.iloc[j-i,j] = HD[j,i]
         return
 
 
+s = Sim()
+s.prepareSimulation(10)

@@ -11,11 +11,12 @@
 import Setup as s
 import Charts as c
 import Analytics as a
+import Payoff as p
 
 def main():
 
     d = s.Data()
-    d.getFreddieData
+    d.getFreddieData()
     #d.getMSAData()
 
     # Schiller Plot
@@ -41,7 +42,10 @@ def main():
     # ch.histBasic(d.getFreddieData, a.calcTotalAppreciation, (1, 1), vintage=2005, age=7)
     # ch.save()
 
-    d = a.payoffIRR(initialInv, investorShare, apprAnnualized, life, discount)
+    # ddd = c.Chart(1,1)
+    # # #d = a.payoffIRR(initialInv, investorShare, apprAnnualized, life, discount)
+    # d2 = p.monthlyPayoffTiming(d.getFreddieData(), ddd.axes, yr="all", dollar=False)
+    # # print(d2)
 
 
     # ch1 = c.Chart(4,1, sharey = False)

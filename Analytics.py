@@ -53,6 +53,7 @@ def chartsMain(msas):
 ###
 #  maybe not needed anymore?
 ##
+
 def moneyBackByVintage(df, yr):
     df['investment'] = df.orig_home_price * (0.1) * (0.9)
     df['expectedPayoff'] = (0.35) * (df.last_home_price - df.orig_home_price + (0.1) * df.orig_home_price) + \
@@ -83,7 +84,17 @@ def payoffDollars(initInvestmentPct, investorShare, origValue, newValue, discoun
     else:
         return 0
 
-#print(payoffDollars(.1, .35, 528000, 265000, .1))
+def payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount):
+    investment = (initInvestmentPct * origValue) * (1-discount)
+    appreciationTotal = newValue - origValue + discount * origValue
+    shareOfAppr = investorShare * appreciationTotal
+    if (investment + shareOfAppr > 0):
+        return (investment + shareOfAppr)/investment
+    else:
+        return 0
+
+
+#print(payoffDollars(.1, .35, 1000000, 1100000, .1))
 
 
 def payoffIRR(initialInv, investorShare, apprAnnualized, life, discount):
