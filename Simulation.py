@@ -1,6 +1,9 @@
 """
     Simultaion: Unfinished
 """
+import numpy as np
+import math
+import pandas as pd
 
 class Sim():
 
@@ -8,10 +11,12 @@ class Sim():
         self.simPeriods = simPeriods
         self.assetLife = assetLife
         self.toyDF = pd.DataFrame(np.zeros(shape=(simPeriods + assetLife, simPeriods)))
-    """
-    Hazard Rate Outcomes
-    """
+
     def buildHazardDistribution(self, hazardRate):
+
+        """
+        Hazard Rate Outcomes
+        """
 
         b = -np.log(1-np.random.random(10000))/0.24
         b = b.clip(max=10)
@@ -19,29 +24,48 @@ class Sim():
         pd.Series(b).plot(kind='kde', secondary_y=True, ax = axes[1], xlim=[0,10])
         axes[1].set_title("Home Sale Rate: 2% per month (10,000 Sims)")
 
+    def buildRandomPrices(self, numRows):
 
-
-
-    def buildRandomPrices(ROWS):
-
-    """"
-    Correlation X1 and X2 are random normal.  X3 = rX1 + sqrt(1-r^2)*X2  || Autocorr:  use previous xi as X1
-    """
+        """"
+        Correlation X1 and X2 are random normal.  X3 = rX1 + sqrt(1-r^2)*X2  || Autocorr:  use previous xi as X1
+        """
 
         monthlyExpectedReturn = 0.03/12
         monthlyVol = 0.05 / math.sqrt(12)
         rho = .60
 
-        N = np.random.normal(monthlyExpectedReturn, monthlyVol, ROWS)
-        HPA = np.zeros(ROWS)
-        homePrices = pd.Series(np.zeros(ROWS))
+        N = np.random.normal(monthlyExpectedReturn, monthlyVol, numRows)
+        HPA = np.zeros(numRows)
+        homePrices = pd.Series(np.zeros(numRows))
 
         HPA[0] = N[1]
         homePrices[0] = 1
 
-        for i in range(1, ROWS):
+        for i in range(1, numRows):
             HPA[i] = rho * HPA[i-1] + (math.sqrt(1-rho**2)) * N[i]
             homePrices[i] = homePrices[i-1] * (1 + HPA[i])
+
+
+
+    def buildMeanReverting(self, numRows):
+
+        """
+        Model mean reverting process for real home prices.
+        Add result to a constantly increasing inflation rate.
+        """
+
+        lam = 16
+        mu = 0
+        sig = 0.05 / 12
+        # time increment is 1 month
+
+        N = np.random.normal(0, 1, numRows)
+        S = pd.Series(np.zeros(numRows))
+        S[0]=100
+        for t in range(1, numRows):
+            S[t] = np.exp(-lam) * S[t-1] + (1 - np.exp(-lam) * mu) + sig *np.sqrt((1-np.exp(-2*lam)/2*lam))*N[t]
+
+
 
 
     def HoldingsMatrix():
