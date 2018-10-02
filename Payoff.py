@@ -180,10 +180,6 @@ def monthlyPayoffTimingAllVintages():
     return
 
 
-
-
-
-
 def returnsByVintageAndMSA(df, msa):
     x = df[df['MSA']==msa].pivot_table(['actualPayoff', 'investment','age'], ['vintage'])
     x['annReturns'] = (x.actualPayoff/x.investment)**(1/x.age)-1

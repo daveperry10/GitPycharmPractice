@@ -141,7 +141,7 @@ def gridOfIRR(d, **kwargs):
 
 def histAppreciationVsPayoff(df, **kwargs):
 
-    """ Not Needed -- replaced by histBasic() """
+    """ Not Needed -- replaced by histGeneric() """
     # todo: delete
 
     titleStringList = pd.Series([''])
@@ -182,19 +182,25 @@ class Chart():
     """
 
     def __init__(self, rows, cols, **kwargs):
+        """
+        Sets up a chart grid for one or more charts
+
+        :param rows: number of rows in the chart grid
+        :param cols: number of columns in the chart grid
+        :keyword sharex: passed to plt.subplots
+        :keyword sharey: passed to plt.subplots
+        :keyword title: figure suptitle
+        """
+
         sharey = kwargs.get('sharey', True)
         sharex = kwargs.get('sharex', True)
         self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        plt.subplots_adjust(hspace = 0.3)
+        plt.subplots_adjust(hspace=0.3)
         self.fig.set_size_inches(7,9.5)
-        self.title = ""
+        self.title = self.fig.suptitle(kwargs.get('title', ''), fontsize=12)
         self.path = s.OUTPUT_PATH
         self.chartfilename = ""
         self.datafile = ""
-
-    def setTitle (self, s):
-        self.fig.suptitle(s , fontsize=12)
-        self.title = s
 
     def setChartFileName (self, s):
         self.chartfilename = s
@@ -231,8 +237,33 @@ class Chart():
         titleStringList[0] = titlestring
         return filt
 
+    def chartBasic(self, df, loc, **kwargs):
+        """
+        Basic plotting function to include pre-existing series in grids with more complicated filtered plots
 
-    def histBasic(self, df, func, loc , **kwargs):
+        :param df: set of series already processed for plotting
+        :param loc: location on grid
+        :keyword title: subplot title if you need one
+        :keyword kind=line type of chart ('line' or 'hist')
+        :return: return 1
+        """
+
+        title = kwargs.get('title', '')
+        kind = kwargs.get('kind', 'line')
+
+        ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+
+        if kind == 'line':
+            df.plot(ax=ax, legend=False)
+        if kind == 'hist':
+            df.hist(ax=ax, bins=25)
+            title = title + " Mean:" + str(round(df.mean(), 2)) + " SD=" + str(round(df.std(), 2))
+
+        ax.set_title(title)
+        return 1
+
+
+    def histGeneric(self, df, func, loc, **kwargs):
 
         """ Histogram filtered on any database field
         - kwargs: all DB fields
@@ -261,7 +292,7 @@ class Chart():
         return
 
 
-    def pivotBasic(self, df, loc, **kwargs):        # todo: make this take columns and multiple rows
+    def pivotGeneric(self, df, loc, **kwargs):        # todo: make this take columns and multiple rows
 
         """ Line Chart for a pivot table, filtered on DB field.
         - kwargs (1): any column name filter
@@ -282,13 +313,13 @@ class Chart():
         return
 
 
-    def ageBasic(self, df, loc, **kwargs):
+    def ageGeneric(self, df, loc, **kwargs):
 
         """ Line Chart for a pivot table, filtered on DB field.
         - kwargs (1): any column name to be used as a df filter
         - kwargs (2): 'title', 'byyear', 'pct'
         """
-        # todo: expand pivotBasic to do cumsum and percent of total, and then remove this
+        # todo: expand pivotGeneric to do cumsum and percent of total, and then remove this
 
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
         titleStringList = pd.Series([''])
