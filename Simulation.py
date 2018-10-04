@@ -11,12 +11,53 @@ import numpy as np
 import math
 import pandas as pd
 import pathlib
+import time
 import matplotlib.pyplot as plt
 import Analytics as a
 import Charts as c
-import time
+
+
+class Timer():
+    """
+    'Poor man's profiler'
+    Drop 'markers' in the code and this will measure the time between markers.
+    Name them according to the functions that follow.
+    """
+    def __init__(self):
+        self.markerList = []        # list of dicts
+        self.previousmark = time.time()
+        self.initialmark = time.time()
+        self.markerList.append(dict(name='init',
+                                    totaltime="{:.4f}s".format(0),
+                                    incrementaltime="{:.4f}s".format(0)))
+        return
+
+    def marker(self, name):
+        self.markerList.append(dict(name=name,
+                                    totaltime="{:.4f}s".format((time.time() - self.initialmark)),
+                                    incrementaltime="{:.4f}s".format((time.time() - self.previousmark))))
+
+        self.previousmark = time.time()
+        return
+
+    def results(self):
+        print('')
+        print("Timing Statistics")
+        for m in self.markerList:
+            print(m['name'] + "\t" + str(m['totaltime']) + "\t" + str(m['incrementaltime']))
+
 
 class Sim():
+
+    class SimData():
+        def __init__(self, rows, columns):
+            self.rows = rows
+            self.columns = columns
+            self.HD, self.PO, self.NV = (np.zeros(shape=(rows, columns)) for i in range(3))
+            self.PP = np.ones(shape=(rows, columns))
+            self.HD[0, 0] = 1000000
+            self.nav = np.zeros(shape=(1, columns))
+            self.AP = np.zeros(shape=(rows, columns))
 
     def __init__(self, numtrials=5, simperiods=144, assetlife=120, **kwargs):
         """
@@ -25,27 +66,73 @@ class Sim():
         :param numtrials: number of  full portfolio nav paths simulated
         :param simperiods: how long the portfolio lives in the simulation (simulate 12 years)
         :param asselife: how long each asset lives (SOTW contract = 120 months)
+        :keyword prepayfile: [simperiods X 2] csv file.  Columns: years(float) and % prepaid (float)
         :keyword debug=False: fills non-essential DFs -- cash flows, P&L, etc.
-        """
 
+        """
+        self._debug = kwargs.get('debug', False)
+
+        self.numTrials = numtrials
         self.simPeriods = simperiods
         self.assetLife = assetlife
-        self.numTrials = numtrials
+
         self.pricePaths = pd.DataFrame()
         self.navPaths = pd.DataFrame()
-        self._debug = kwargs.get('debug', False)
-        self.startTime = time.time()
+        self.timer = Timer()
 
-    def analyzeSimResults(self):
-        """ 2, 5, and 10yr hist, mean, and sd for hist results and """
+        #self.prepayfile = pathlib.Path(kwargs.get('prepayfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/deck_prepayments.csv'))
+        self.prepayfile = pathlib.Path(kwargs.get('prepayfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/all.csv'))
+        self.prepaymentCurve = pd.read_csv(self.prepayfile, header=None).iloc[:, 1].cumsum()
+        self.pricePaths = self.buildMeanReverting()
+        self.navPaths = pd.DataFrame(np.zeros(shape=(self.simPeriods, self.numTrials)))
 
-        ch = c.Chart(3, 1, sharex=False, sharey=False, title="NAV Distribution at 2, 5, 10 Years")
+        self.simdata = self.SimData(self.assetLife + self.simPeriods, self.simPeriods)
+        #self.HD, self.PO, self.NV = (np.zeros(shape=(self.rows, self.columns)) for i in range(3))
 
-        ch.chartBasic(self.pricePaths.iloc[24, :], (0, 0), kind='hist', title="2yrs")
-        ch.chartBasic(self.pricePaths.iloc[60, :], (1, 0), kind='hist', title="5yrs")
-        ch.chartBasic(self.pricePaths.iloc[120, :], (2, 0), kind='hist', title="10yrs")
 
-        plt.show()
+        for i in range(0,self.simPeriods):
+            self.simdata.PP[i + 1: i + self.assetLife + 1, i] = self.prepaymentCurve
+
+    def top(self, num, bottom = False):
+        # take the last row of navPaths and sort it
+        # find the index of the top values in the sort
+        # get the navPaths and pricePaths of those indices
+
+        sorted = self.navPaths.iloc[-1,:].sort_values()
+        indices = sorted.head(num).index if bottom else sorted.tail(num).index
+        title = "Bottom" if bottom else "Top"
+        navpaths = self.navPaths[indices]
+        pricepaths = self.pricePaths[indices]
+
+        ch = c.Chart(2, 1, sharex=False, sharey=False, title=title)
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.05 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.10 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.15 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
+        ch.chartBasic(pd.Series([(1 + 0.02 / 12) ** x for x in range(0, self.simPeriods)]), (1, 0))
+        ch.chartBasic(navpaths, (0, 0))
+        ch.chartBasic(pricepaths.iloc[:self.simPeriods, :], (1, 0))
+        ch.save()
+
+
+    def analyze(self, evalperiods):
+        """ 2, 5, and 10yr hist, mean, and sd for sim results
+         Produces histogram chart if self._charts is True
+         :param evalperiods: list of time periods for calculating summary statistics
+         """
+
+        ch = c.Chart(len(evalperiods), 1, sharex=True, sharey=False, title="NAV Distribution at Various Times")
+
+        for p in evalperiods:
+            ch.chartBasic((self.navPaths.iloc[p, :] / 1e6) ** (1 / (p/12)) - 1, (evalperiods.index(p), 0), kind='hist',
+                          bins=np.arange(-1, 1, .02), title=str(p) +" Months")
+
+
+        print('')
+        for p in evalperiods:
+            df = (self.navPaths.iloc[p, :] / 1e6) ** (1 / (p/12)) - 1
+            print(str(p) + " Month Mean:" + str(round(df.mean(), 2)) + " SD=" + str(round(df.std(), 2)))
+
+        ch.save()
 
     def buildHazardDistribution(self, hazardRate):
 
@@ -96,7 +183,6 @@ class Sim():
         S = pd.Series(np.zeros(numRows))
         S[0] = 100
 
-
         paths = pd.DataFrame(np.zeros(shape=(numRows, self.numTrials)))
 
         if self._debug:
@@ -110,34 +196,19 @@ class Sim():
             paths.iloc[:, i] = S
         return paths/S[0]
 
+    def chart(self):
+        ch = c.Chart(2, 1, sharex=False, sharey=False, title="SimHist")
 
-    def prepareSimulation(self):
+        # bogey lines
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.15 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
+        ch.chartBasic(pd.Series([(1 + 0.02 / 12) ** x for x in range(0, self.simPeriods)]), (1, 0))
 
-        """Get the data, run the sim, do the plots
-        :return 1
-        """
-
-        freddieFile = pathlib.Path("C:/Users/Dave/Documents/Sum/Analytics/Data/all.csv")
-        prepaymentsByMonth = pd.read_csv(freddieFile, header=None)
-        prepaymentCurve = prepaymentsByMonth.iloc[:, 1].cumsum()
-
-        self.pricePaths = self.buildMeanReverting()
-        self.navPaths = pd.DataFrame(np.zeros(shape=(self.simPeriods, self.numTrials)))
-
-        for i in range(0, self.numTrials):
-            self.navPaths.iloc[:, i] = self.runSimulation(self.pricePaths.iloc[:, i], prepaymentCurve)
-
-
-        ch = c.Chart(2, 1, sharex=False, sharey=False)
-        ch.chartBasic(self.navPaths.iloc[:self.simPeriods, :], (0, 0), title="Portfolio NAV in 10MMs")
+        # price and NAV paths
+        ch.chartBasic(self.navPaths.iloc[:self.simPeriods, :], (0, 0), title="Portfolio NAV")
         ch.chartBasic(self.pricePaths.iloc[:self.simPeriods, :], (1, 0), title="Price Path (2% avg HPA)")
-        # 2% inflation line and 10% hedge fund bogey line
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.18/12) ** x for x in range(0, self.simPeriods)]), (0, 0))
-        ch.chartBasic(pd.Series([(1 + 0.02/12) ** x for x in range(0, self.simPeriods)]), (1, 0))
-        plt.show()
+        ch.save()
 
-
-    def runSimulation(self, pricePath, prepayCurve):
+    def simulate(self):
 
         """ Build up the holdings and cashflows.  Handle reinvestments with matrix approach -- Time x Vintage.
 
@@ -163,67 +234,46 @@ class Sim():
         The HD[j,j] are the initial amount for a vintage.  It is the "sum product" (dot product) of the payoffs
         and the prepays that year(which are in invested amount units) for that row.
         Now you have holdings that are increasing in total amount over time as profits are returned for reinvestment
-
         Now payoffs (PO) can be multiplied straight through by holdings (HD) to get NAV (nav)
-
-        :param pricePath: [1 x simPeriods]
-        :param prepayCurve: [1 x assetLife]
         """
 
-        ROWS = self.assetLife + self.simPeriods
-        COLUMNS = self.simPeriods
+        self.timer.marker("start sim")
 
-        HD, PO, NV = (np.zeros(shape=(ROWS, COLUMNS)) for i in range(3))
+        for trial in range(0, self.numTrials):
 
-        PP = np.ones(shape=(ROWS, COLUMNS))
+            print(str(trial) + " of " + str(self.numTrials) + " trials")
+            self.timer.marker("\nstarting " + str(trial + 1) + ' of ' + str(self.numTrials))
+            self.timer.marker("reset HD")
+            self.simdata.HD = np.zeros(shape=(self.simdata.rows, self.simdata.columns))
+            self.simdata.HD[0, 0] = 1000000
 
-        HD[0, 0] = 1000000
-        nav = np.zeros(shape=(1, COLUMNS))
+            self.timer.marker("set PO")
+            for i in range(0, self.simPeriods):
+                for j in range(max(i-self.assetLife, 0), min(i, self.simPeriods-1)+1): # follows live vintages
+                    if self._debug:
+                        self.simdata.AP[i, j] = (self.pricePaths[trial][i] / self.pricePaths[trial][j] - 1) if ((i >= j) & (i - j < self.assetLife + 1)) else 0
+                    self.simdata.PO[i, j] = a.payoffPct(0.1, 0.35, self.pricePaths[trial][j], self.pricePaths[trial][i], 0.1) if ((i >= j) & (i - j < self.assetLife + 1)) else 0
 
+            self.timer.marker("set HD")
+            for i in range(1, self.simPeriods):
+                #self.timer.marker("HD" + str(i))
+                for j in range(max(i - self.assetLife, 0), min(i, self.simPeriods - 1) + 1):
+                    self.simdata.HD[i, j] = self.simdata.HD[j, j] * (1 - self.simdata.PP[i, j])
+                if i < self.simPeriods:
+                    # new investment is in HD[i,i].
+                    # add prepaments across all vintages
+                    self.simdata.HD[i, i] = np.dot(self.simdata.HD[i - 1, :] - self.simdata.HD[i, :], self.simdata.PO[i, :])
+                    # subtract
 
-        if self._debug:
-            AP = np.zeros(shape=(ROWS, COLUMNS))
-            HD_check = np.zeros(shape=(ROWS, COLUMNS))
-            HD_check[0, 0] = 1000000
-        for i in range(0,self.simPeriods):
-            PP[i + 1: i + self.assetLife + 1, i] = prepayCurve
+            self.timer.marker("set NV")
+            self.simdata.NV = self.simdata.PO * self.simdata.HD
 
-        # Appreciation is price difference from time of purchase to time of evaluation:
-        # Payoff is SOTW payoff over same time
+            self.timer.marker("set nav")
 
-        for i in range(0, ROWS):
-            for j in range(max(i-self.assetLife, 0), min(i,self.simPeriods)):
-            #for j in range(max(i-self.assetLife + 1, 0), i):
-                if self._debug:
-                    AP[i, j] = (pricePath[i]/pricePath[j]-1) if ((i >= j) & (i-j < self.assetLife + 1)) else 0
+            self.navPaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.simPeriods].T
+            self.timer.marker("finished " + str(trial + 1) + ' of ' + str(self.numTrials))
 
-                #PO[i, j] = 1
-                PO[i,j] = (pricePath[j] * a.payoffPct(.1,.35,pricePath[j], pricePath[i],.1)) if ((i >= j) & (i-j < self.assetLife + 1)) else 0
-
-        # Holdings is the amount not prepaid. On the i=j it is the amount re-invested
-
-        for i in range(1, ROWS):
-            for j in range(0, min(COLUMNS, i)):         # columns = simPeriods = vintages
-                if self._debug:
-                    HD_check[i, j] = np.round(HD_check[j, j] * (1-PP[i, j]), 0)
-                # get the remaining amounts of each vintage j at time i
-                # each vintage holding = the %age of it surviving * that vintage's initial holding (HD[j,j]).  HD[i,i] isn't needed yet.
-                HD[i, j] = HD[j, j] * (1-PP[i, j])
-
-
-            if i < self.simPeriods:
-                if self._debug:
-                    HD_check[i, i] = np.round((HD_check[i-1,:] - HD_check[i, :]).sum(), 0)
-                # sum product of the previous holdings and the payoff of vintage j at time i
-                HD[i, i] = np.dot(HD[i - 1, :] - HD[i, :], PO[i, :])
-
-        # Net asset value is the payoff times each amount of each vintage held at each time period
-        NV = PO * HD
-
-        # nav is the vector version, summing the whole portfolio value at each time period
-        nav = NV.sum(axis=1)[:self.simPeriods].T
-        nav[0] = 1000000
-        return nav
+        return
 
     def getPortfolioHoldingsByAge(self, LIFE, PERIODS, HD):
 
@@ -252,10 +302,14 @@ class Sim():
         PL = np.round(CF * PO,0)
         return
 
-import time
+s = Sim(numtrials=1000, assetlife=120, simperiods=180,
+        prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/deck_prepayments.csv", debug=False)
 
+s.simulate()
+#s.chart()
+s.timer.results()
+s.analyze(evalperiods=[12, 24, 60, 120, 179])
+s.top(5)
+s.top(5, bottom=True)
 
-s = Sim(numtrials=10, assetlife=120, simperiods=144,debug=False)
-s.prepareSimulation()
-print("Time Elapsed: {:.2f}s".format(time.time() - s.startTime))
-s.analyzeSimResults()
+plt.show()

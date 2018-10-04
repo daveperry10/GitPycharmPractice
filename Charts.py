@@ -10,7 +10,7 @@ Charts Module:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from Analytics import payoffIRR
+
 import Setup as s
 
 def plotCaseSchiller(df):
@@ -197,13 +197,11 @@ class Chart():
         self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
         plt.subplots_adjust(hspace=0.3)
         self.fig.set_size_inches(7,9.5)
-        self.title = self.fig.suptitle(kwargs.get('title', ''), fontsize=12)
+        self.title = kwargs.get('title', '')
+        self.fig.suptitle(self.title, fontsize=12)
         self.path = s.OUTPUT_PATH
-        self.chartfilename = ""
+        self.chartfilename = self.title
         self.datafile = ""
-
-    def setChartFileName (self, s):
-        self.chartfilename = s
 
     def save (self):
         self.fig.savefig(self.path / (self.chartfilename + '.png'))
@@ -250,13 +248,14 @@ class Chart():
 
         title = kwargs.get('title', '')
         kind = kwargs.get('kind', 'line')
+        bins = kwargs.get('bins', 25)
 
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
 
         if kind == 'line':
             df.plot(ax=ax, legend=False)
         if kind == 'hist':
-            df.hist(ax=ax, bins=25)
+            df.hist(ax=ax, bins=bins)
             title = title + " Mean:" + str(round(df.mean(), 2)) + " SD=" + str(round(df.std(), 2))
 
         ax.set_title(title)

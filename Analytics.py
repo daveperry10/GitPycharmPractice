@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import pymysql as db
 import pandas as pd
 
-
-
 def calcAnnualizedAppreciation(row):
     return (row['last_home_price'] / row['orig_home_price']) ** (1 / row['age_float']) - 1
 
@@ -84,7 +82,49 @@ def payoffDollars(initInvestmentPct, investorShare, origValue, newValue, discoun
     else:
         return 0
 
+def defaultablePayoff(initInvestmentPct, investorShare, origValue, newValue, discount, defaultRate):
+    """
+
+    1.  defaultRate * origValue is the amount of the vintage issuance that's defaulting at this time
+        if sim is in months, this should be a monthly rate
+    2.  that amount investors will receive on that amount is the max of homeowner equity and the SOTW payoffPct()
+    3.  on the rest, investors will receive SOTW payoffPct()
+
+    Equity Assumptions:
+        a. straightline amoritization of 1/360 per month
+        b. 80% LTV => original loan balance was origValue
+    #assume
+
+    :param initInvestmentPct: percentage of appraised home value funded by investor
+    :param investorShare: percentage of appreciation the investor earns
+    :param origValue: original appraised home value (time j)
+    :param newValue: apraised home value at time of evaluation (time i)
+    :param discount: initial appraisal discount
+    :param defaultRate: annualized default rate
+
+    :return:
+    """
+
+
+    equity =
+
+    regularPayoff = payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount)
+    defaultPayoff = max(equity, regularPayoff)
+
+
+    return defaultRate * defaultPayoff + (1- defaultRate) * regularPayoff
+
+
 def payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount):
+    """
+
+    :param initInvestmentPct: percentage of appraised home value funded by investor
+    :param investorShare: percentage of appreciation the investor earns
+    :param origValue: original appraised home value (time j)
+    :param newValue: apraised home value at time of evaluation (time i)
+    :param discount: initial appraisal discount
+    :return:
+    """
     investment = (initInvestmentPct * origValue) * (1-discount)
     appreciationTotal = newValue - origValue + discount * origValue
     shareOfAppr = investorShare * appreciationTotal
@@ -92,10 +132,6 @@ def payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount):
         return (investment + shareOfAppr)/investment
     else:
         return 0
-
-
-#print(payoffDollars(.1, .35, 1000000, 1100000, .1))
-
 
 def payoffIRR(initialInv, investorShare, apprAnnualized, life, discount):
     """

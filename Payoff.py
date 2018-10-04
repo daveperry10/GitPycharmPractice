@@ -124,34 +124,6 @@ def monthlyPayoffTimingByVintage():
     fig.savefig(freddie_path/ ("Payoff by Termination Age" + '.png'))
     return
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def monthlyPayoffTimingAllVintages():
     import matplotlib.ticker as t
     import Setup as s
