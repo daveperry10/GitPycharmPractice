@@ -82,7 +82,7 @@ def payoffDollars(initInvestmentPct, investorShare, origValue, newValue, discoun
     else:
         return 0
 
-def defaultablePayoff(initInvestmentPct, investorShare, origValue, newValue, discount, defaultRate):
+def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, discount, age):
     """
 
     1.  defaultRate * origValue is the amount of the vintage issuance that's defaulting at this time
@@ -93,7 +93,9 @@ def defaultablePayoff(initInvestmentPct, investorShare, origValue, newValue, dis
     Equity Assumptions:
         a. straightline amoritization of 1/360 per month
         b. 80% LTV => original loan balance was origValue
-    #assume
+
+    Note payoffPct() returns an investment return on initial investment of (1 - discount) * initInvestmentPct.  Equity
+    coverage here needs to be scaled the same way.
 
     :param initInvestmentPct: percentage of appraised home value funded by investor
     :param investorShare: percentage of appreciation the investor earns
@@ -104,15 +106,20 @@ def defaultablePayoff(initInvestmentPct, investorShare, origValue, newValue, dis
 
     :return:
     """
+    LTV = 0.95
+    origLoanBalance = origValue * LTV
+    currentLoanBalance = origLoanBalance # * (1 - age * 1/360)
+    equity = newValue - currentLoanBalance
+    invSize = (1 - discount) * initInvestmentPct
 
+    #un-scale the normal payoff to put it in home price terms
+    oweToSOTW = invSize * payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount)
 
-    equity =
+    # now scale the result back down to investment size to put it in payoff terms
+    defaultPayoff = min(equity, oweToSOTW)/invSize
 
-    regularPayoff = payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount)
-    defaultPayoff = max(equity, regularPayoff)
-
-
-    return defaultRate * defaultPayoff + (1- defaultRate) * regularPayoff
+    return defaultPayoff if defaultPayoff > 0 else 0
+    #return defaultRate * defaultPayoff + (1- defaultRate) * regularPayoff
 
 
 def payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount):

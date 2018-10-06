@@ -10,7 +10,6 @@ Charts Module:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
 import Setup as s
 
 def plotCaseSchiller(df):
@@ -248,15 +247,16 @@ class Chart():
 
         title = kwargs.get('title', '')
         kind = kwargs.get('kind', 'line')
+        legend = kwargs.get('legend', False)
         bins = kwargs.get('bins', 25)
 
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
 
         if kind == 'line':
-            df.plot(ax=ax, legend=False)
+            df.plot(ax=ax) # , legend=False)
         if kind == 'hist':
             df.hist(ax=ax, bins=bins)
-            title = title + " Mean:" + str(round(df.mean(), 2)) + " SD=" + str(round(df.std(), 2))
+            title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
 
         ax.set_title(title)
         return 1
