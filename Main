@@ -15,8 +15,7 @@ import Payoff as p
 
 def main():
 
-    d = s.Data()
-    d.getFreddieData()
+    d = s.Data()    d.getFreddieData()
     #d.getMSAData()
     ch = c.Chart(1,2,)
 

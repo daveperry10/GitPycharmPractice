@@ -82,7 +82,7 @@ def payoffDollars(initInvestmentPct, investorShare, origValue, newValue, discoun
     else:
         return 0
 
-def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, discount, age):
+def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, discount, age, oltv):
     """
 
     1.  defaultRate * origValue is the amount of the vintage issuance that's defaulting at this time
@@ -106,8 +106,8 @@ def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, 
 
     :return:
     """
-    LTV = 0.95
-    origLoanBalance = origValue * LTV
+
+    origLoanBalance = origValue * oltv
     currentLoanBalance = origLoanBalance # * (1 - age * 1/360)
     equity = newValue - currentLoanBalance
     invSize = (1 - discount) * initInvestmentPct

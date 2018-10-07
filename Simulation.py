@@ -47,11 +47,12 @@ class Timer():
 
 
 class Asset():
-    def __init__(self, initialInv=0.1, investorShare= 0.35, discount=0.1):
+    def __init__(self, initialInv=0.1, investorShare= 0.35, discount=0.1, oltv = 0.8):
         self.initialInv = initialInv
         self.investorShare = investorShare
         self.discount = discount
-
+        self.oltv = oltv
+        
 class StochasticProcess():
     def __init__(self, trials, portfolioLife, assetLife, seed=0):
         self.trials = trials
@@ -105,29 +106,35 @@ class Simulation():
             self.DF = np.zeros(shape=(rows, columns))
             self.HD[0, 0] = 1000000
             self.nav = np.zeros(shape=(1, columns))
-            self.cashflow = np.zeros(shape=(1, columns))
+            self.cashflow = np.zeros(columns)
 
-    def __init__(self, asset, process, **kwargs):
+    def __init__(self, asset, process, ramp, **kwargs):
         """
         Set the shape parameters of the data storage for the simulation
 
         :param asset: Asset()
         :param process: StochasticProcess()
-        :param numtrials: number of full portfolio nav paths simulated
+        :param trials: number of full portfolio nav paths simulated
+        :param ramp: list of incoming cash by period.  must be shorter than portfolioLife.
 
         :keyword prepayfile: [simperiods X 2] csv file.  Columns: years(float) and % prepaid (float)
         :keyword default=False: apply default logic to holdings, calculate defaultable payoffs based on equity
         :keyword debug=False: fills non-essential DFs -- cash flows, P&L, etc.
+        :keyword termloss=True: calculate a loss at 10yr term based on min (home equity, payoff)
+        :keyword dividend: float.  cumulative dividend.  Units = percent of NAV
         """
 
         self.asset = asset
         self.process = process
-        self._debug = kwargs.get('debug', False)
-        self.default = kwargs.get('default', False)
-        self.trials = process.trials
+        self.ramp = ramp
+        self.dividend = kwargs.get('dividend', 0) / 12
 
-        #self.pricePaths = pd.DataFrame()
-        self.navPaths = pd.DataFrame()
+        # branching arguments
+        self._debug = kwargs.get('debug', False)
+        self._default = kwargs.get('default', False)
+        self._termLoss = kwargs.get('termloss', True)
+        self._flatdiv = kwargs.get('flatdiv', False)
+
         self.timer = Timer()
 
         self.prepayfile = pathlib.Path(kwargs.get('prepayfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv'))
@@ -136,37 +143,37 @@ class Simulation():
         self.prepaymentCurve = pd.read_csv(self.prepayfile, header=None).iloc[:, 1].cumsum()
         self.defaultCurve = pd.read_csv(self.defaultfile, header=None).iloc[:, 1].cumsum()
 
-        self.navPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.trials)))
-        self.dfNavPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.trials)))
+        self.navPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.cashFlowPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.dfNavPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
 
         self.simdata = self.SimData(self.process.portfolioLife + self.process.portfolioLife, self.process.portfolioLife)
-        #self.HD, self.PO, self.NV = (np.zeros(shape=(self.rows, self.columns)) for i in range(3))
 
-        self.totalLoss = pd.Series(np.zeros(self.trials))
+        self.totalLoss = pd.Series(np.zeros(self.process.trials))
 
-        for i in range(0,self.process.portfolioLife):
+        for i in range(0, self.process.portfolioLife):
             self.simdata.PP[i + 1: i + self.process.assetLife + 1, i] = self.prepaymentCurve
-            if self.default:
+            if self._default:
                 self.simdata.DF[i + 1: i + self.process.assetLife + 1, i] = self.defaultCurve
 
-    def top(self, num, bottom = False):
+    def top(self, num, bottom=False):
         # take the last row of navPaths and sort it
         # find the index of the top values in the sort
         # get the navPaths and pricePaths of those indices
 
-        sorted = self.navPaths.iloc[-1,:].sort_values()
+        sorted = self.navPaths.iloc[-1, :].sort_values()
         indices = sorted.head(num).index if bottom else sorted.tail(num).index
         title = "Bottom" if bottom else "Top"
         navpaths = self.navPaths[indices]
-        pricepaths = self.pricePaths[indices]
+        pricepaths = self.process.pricePaths[indices]
 
         ch = c.Chart(2, 1, sharex=False, sharey=False, title=title)
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.05 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.10 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.15 / 12) ** x for x in range(0, self.simPeriods)]), (0, 0))
-        ch.chartBasic(pd.Series([(1 + 0.02 / 12) ** x for x in range(0, self.simPeriods)]), (1, 0))
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.05 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.10 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
+        ch.chartBasic(pd.Series([1000000 * (1 + 0.15 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
+        ch.chartBasic(pd.Series([(1 + 0.02 / 12) ** x for x in range(0, self.process.portfolioLife)]), (1, 0))
         ch.chartBasic(navpaths, (0, 0))
-        ch.chartBasic(pricepaths.iloc[:self.simPeriods, :], (1, 0))
+        ch.chartBasic(pricepaths.iloc[:self.process.portfolioLife, :], (1, 0))
         ch.save()
 
 
@@ -276,45 +283,81 @@ class Simulation():
         prepays = np.zeros(self.process.portfolioLife)
         previous = np.zeros(self.process.portfolioLife)
         remaining = np.zeros(self.process.portfolioLife)
+        sharesOutstanding = np.zeros(self.process.portfolioLife)
+        termLoss10y = np.zeros(self.process.portfolioLife)
 
-        for trial in range(0, self.trials):
-
-            print(str(trial+1) + " of " + str(self.trials) + " trials")
-            self.timer.marker("\nstarting " + str(trial + 1) + ' of ' + str(self.trials))
-            self.timer.marker("reset HD")
-            self.simdata.HD = np.zeros(shape=(self.simdata.rows, self.simdata.columns))
-
-            self.simdata.HD[0, 0] = 1000000
-
-            self.timer.marker("set PO")
+        for trial in range(0, self.process.trials):
             import Analytics as a
+            print(str(trial+1) + " of " + str(self.process.trials) + " trials")
+            self.timer.marker("\nstarting " + str(trial + 1) + ' of ' + str(self.process.trials))
+            self.simdata.HD = np.zeros(shape=(self.simdata.rows, self.simdata.columns))
+            self.simdata.HD[0, 0] = self.ramp[0]
+
+            sharesOutstanding[0] = self.ramp[0]
+            totalDivOwed = 0
+            totalDivPaid = 0
+
+            """PAYOFF MATRIX BUILD-UP"""
+            self.timer.marker("set PO")
             for i in range(0, self.process.portfolioLife):
                 for j in range(max(i-self.process.assetLife, 0), min(i, self.process.portfolioLife-1)+1): # follows live vintages
 
                     age = i-j
                     self.simdata.DFPO[i, j] = a.defaultablePayoffPct(self.asset.initialInv, self.asset.investorShare,
-                                self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], self.asset.discount, age) if ((i >= j) & (i - j < self.process.assetLife + 1)) else 0
+                                self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], self.asset.discount, age, self.asset.oltv) if ((i >= j) & (i - j < self.process.assetLife + 1)) else 0
 
                     self.simdata.PO[i, j] = a.payoffPct(self.asset.initialInv, self.asset.investorShare,
                                 self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], self.asset.discount) if ((i >= j) & (i - j < self.process.assetLife + 1)) else 0
 
+            """HOLDINGS MATRIX BUILD-UP"""
             self.timer.marker("set HD")
             for i in range(1, self.process.portfolioLife):
                 #for each vintage that is active
-                for j in range(max(i - self.process.assetLife, 0), min(i, self.process.portfolioLife - 1) + 1):
+                for j in range(max(i - self.process.assetLife, 0), min(i, self.process.portfolioLife - 1) + 1):             # set holdings for i!=j
 
                     self.simdata.HD[i, j] = self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i, j]) # now HD is the orig bal that hasn't defaulted or prepaid
 
-                    previous[j]= self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i-1, j])
-                    remaining[j]= self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i, j])
+                    previous[j] = self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i-1, j])
+                    remaining[j] = self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i, j])
                     defaults[j] = self.simdata.HD[j, j] * (self.simdata.DF[i, j] - self.simdata.DF[i - 1, j])
+
                     prepays[j] = self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (self.simdata.PP[i, j] - self.simdata.PP[i - 1, j])  #prepays are calculated on non-defaulted balance
 
+                    """10 YEAR TERM LOGIC"""
+                    if (i-j) == self.process.assetLife:                         # find the final payoff for vintage j.
+                        termLoss10y[i] = prepays[j] * self.simdata.PO[i, j] - self.simdata.DFPO[i,j]  #final payment losses are the diff betw normal prepay amount and same amount in default scenario
+
+                """INVESTMENT / REINVESTMENT LOGIC"""
                 if i < self.process.portfolioLife:
-                    a = np.dot(prepays, self.simdata.PO[i, :])  # apply performing payoff matrix to prepays
-                    b = np.dot(defaults, self.simdata.DFPO[i, :]) #apply defaulted payoff matrix to defaults
-                    self.simdata.HD[i, i] = a + b  # reinvest the total proceeds of defaults and prepays
-                    loss = np.dot(defaults,self.simdata.PO[i, :]) - b
+
+                    a = np.dot(prepays, self.simdata.PO[i, :])                          # prepays pay the Payoff amount
+                    b = np.dot(defaults, self.simdata.DFPO[i, :])                       # defaults pay the default payoff amount of min(equity, payoff)
+                    c = np.dot(remaining, self.simdata.PO[i, :])                        # remaining balance is worth its payoff value
+                    d = termLoss10y[i] if self._termLoss else 0                         # final payments pay the default payoff amount of min(equity, payoff)
+
+                    reinvestableCashFlow = a + b - d
+                    currentNAV = (a+b+c-d)/sharesOutstanding[i-1]                      # starting NAV per Share
+
+                    if self._flatdiv:
+                        totalDivOwed = totalDivOwed + self.dividend * sharesOutstanding[i-1]
+                    else:
+                        totalDivOwed = totalDivOwed + self.dividend * currentNAV * sharesOutstanding[i - 1]
+
+                    payment = min(totalDivOwed - totalDivPaid, reinvestableCashFlow)
+                    totalDivPaid = totalDivPaid + payment
+                    reinvestment = reinvestableCashFlow - payment                       # can't be < zero
+                    capStockReduction = 0 #payment / currentNAV  """maybe no reduction bc only paying out of reinvestable cash."""                       # this translates from nav terms back to share terms.
+                                                                                        # The div reduces the size of the fund.  modified share amount is used below to recalc NAV.
+                    self.simdata.HD[i, i] = reinvestment                                # reinvest the total proceeds of defaults and prepays
+                    self.simdata.cashflow[i] = payment                                  # record the generated cashflow for reporting
+
+                    sharesOutstanding[i] = sharesOutstanding[i - 1] - capStockReduction
+
+                    if len(self.ramp) > i:
+                        self.simdata.HD[i, i] = self.simdata.HD[i, i] + self.ramp[i]                            # add in new investment from the ramp (in original value terms)
+                        sharesOutstanding[i] = sharesOutstanding[i] + self.ramp[i]/currentNAV                   # add to shares out
+
+                    loss = np.dot(defaults, self.simdata.PO[i, :]) - np.dot(defaults, self.simdata.DFPO[i, :])  # loss is the difference between result in DF scenario and PO scenario
                     self.totalLoss[trial] = self.totalLoss[trial] + loss
 
                     if self._debug:
@@ -333,15 +376,18 @@ class Simulation():
                            "\tloss=" + str(round(loss,0)),
                            "\ttotal loss=" + str(round(self.totalLoss[trial],0)))
 
+            """NAV CALCULATION"""
             self.timer.marker("set NV")
             self.simdata.NV = self.simdata.PO * self.simdata.HD
-            self.simdata.DFNV = self.simdata.DFPO * self.simdata.HD
+            self.simdata.DFNV = self.simdata.DFPO * self.simdata.HD  # not sure this is right or necessary
 
             self.timer.marker("set nav")
 
-            self.navPaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.process.portfolioLife].T
-            self.dfNavPaths.iloc[:, trial] = self.simdata.DFNV.sum(axis=1)[:self.process.portfolioLife].T
-            self.timer.marker("finished " + str(trial + 1) + ' of ' + str(self.trials))
+            self.navPaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.process.portfolioLife].T / sharesOutstanding
+            self.dfNavPaths.iloc[:, trial] = self.simdata.DFNV.sum(axis=1)[:self.process.portfolioLife].T / sharesOutstanding
+            self.cashFlowPaths.iloc[:, trial] = self.simdata.cashflow
+
+            self.timer.marker("finished " + str(trial + 1) + ' of ' + str(self.process.trials))
 
         return
 
@@ -361,43 +407,50 @@ class Simulation():
                 ages.iloc[j-i,j] = HD[j,i]
         return
 
-    def getPotentialCashFlow(self):
-
-        """
-        get cash flow out of holdings.  Potential cash flow is the HD[i,i] (same as the amount you assume you reinvest)
-        """
-
-        for i in range(1, PERIODS):
-            self.simdata.cashflow[i] = self.simdata.HD[i, i]
-        return self.simdata.cashflow
-
 #                   #
 #   A/B Testing     #
 #                   #
+def ABTest():
+    """
+    Show NAV Path, Cash Flow Path, and Price Path for simulation runs with one or more parameter changed on
+    the second run.
+    Notes:  Trials must be 1.
 
-seed = 7
+    :return:
+    """
+    trials = 1 # (do not change)
+    seed = 1
 
-chart = c.Chart(2,1, sharex=True, sharey=False, title="wow")
-process = MeanRevertingProcess(trials=1, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
-asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1)
-sim = Simulation(asset, process, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv", defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv", debug=True, default=True)
-sim.simulate()
+    #ramp = [1e6, 1e6, 1e6,1e6, 1e6, 1e6,1e6, 1e6, 1e6, 1e6]  # 1MM per month for 10 months
+    ramp = [1e6]
+    chart = c.Chart(3,1, sharex=True, sharey=False, title="Simulated A-B Parameter Test")
 
-sim.navPaths.columns = ['Investor share = 10%, discount = 10%']
-chart.chartBasic(sim.navPaths,(0,1), title="A-B Test")
+    """first run"""
+    process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8)
+    sim = Simulation(asset, process, ramp ,prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
+                     defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv",
+                     debug=False, default=True, dividend=.06, termloss=True, flatdiv=True)
+    sim.simulate()
+    sim.navPaths.columns = ['run 1']
+    chart.chartBasic(sim.navPaths,(0,1))
+    chart.chartBasic(sim.cashFlowPaths.iloc[1:,:],(1,1),title="Cash Flow Paths", legend =False)
 
-process = MeanRevertingProcess(trials=1, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
-asset = Asset(initialInv=0.1, investorShare=0.35, discount=0)
-sim = Simulation(asset, process, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv", defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv", debug=True, default=True)
-sim.simulate()
-sim.navPaths.columns = ['Investor Share = 35%, discount = 0%']
-chart.chartBasic(sim.navPaths,(0,1))
+    """second run"""
+    process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8)
+    sim = Simulation(asset, process, ramp, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
+                     defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv",
+                     debug=False, default=True, dividend=.1, termloss=True, flatdiv=True)
+    sim.simulate()
+    sim.navPaths.columns = ['run 2']
+    chart.chartBasic(sim.navPaths,(0,1),title="NAV Paths")
+    chart.chartBasic(sim.cashFlowPaths.iloc[1:,:],(1,1),title="Cash Flow Paths", legend=False)
 
-sim.process.pricePaths.columns = ['Price Paths']
-chart.chartBasic(sim.process.pricePaths,(1,1))
+    chart.chartBasic(sim.process.pricePaths,(2,1), title="Price Path", legend=False)
+    plt.show()
 
-plt.show()
-
+ABTest()
 #sim.timer.results()
 #sim.analyze(evalperiods=[12, 24, 60, 120])
 #sim.top(5)
