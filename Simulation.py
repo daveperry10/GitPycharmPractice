@@ -491,52 +491,7 @@ class Simulation():
 #                   #
 #   A/B Testing     #
 #                   #
-def ABTest():
-    """
-    Show NAV Path, Cash Flow Path, and Price Path for simulation runs with one or more parameter changed on
-    the second run.
-    Notes:  Trials must be 1.
 
-    :return:
-    """
-    trials = 1 # (do not change)
-    seed = 2
-    #ramp = [1e6, 1e6, 1e6,1e6, 1e6, 1e6,1e6, 1e6, 1e6, 1e6]  # 1MM per month for 10 months
-    ramp = [1e6]
-    chart = c.Chart(3,1, sharex=True, sharey=False, title="Sim: single price path, Div vs. No Div")
-
-    """First run"""
-    process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.03, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0)
-    sim = Simulation(asset, process, ramp ,prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",
-                     defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv",
-                     debug=False, default=True, dividend=.06, termloss=True, flatdiv=True)
-    sim.simulate()
-    sim.navPaths.columns = ['6% Dividend']
-    chart.chartBasic(sim.navPaths,(0,1), style='b-')
-
-    sim.dividendPaths.columns = ['Div'];sim.performanceFeePaths.columns=['Perf'];  sim.servicingFeePaths.columns=['Serv']
-    chart.chartBasic(sim.dividendPaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b-')
-    chart.chartBasic(sim.performanceFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b--')
-    chart.chartBasic(sim.servicingFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b-.')
-
-    """second run"""
-    process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.03, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0)
-    sim = Simulation(asset, process, ramp, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",
-                     defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv",
-                     debug=False, default=True, dividend=0, termloss=True, flatdiv=True)
-    sim.simulate()
-    sim.navPaths.columns = ['No Dividend']
-    sim.dividendPaths.columns = ['Div']; sim.performanceFeePaths.columns = ['Perf']; sim.servicingFeePaths.columns = ['Serv']
-    chart.chartBasic(sim.navPaths, (0, 1), title="NAV Paths", style='r-')
-    #chart.chartBasic(sim.dividendPaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r-')
-    chart.chartBasic(sim.performanceFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r--')
-    chart.chartBasic(sim.servicingFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r-.')
-
-    chart.chartBasic(sim.process.pricePaths, (2, 1), title="Price Path", legend=False, style='b-')
-    #
-    plt.show()
 
 ABTest()
 #sim.timer.results()
