@@ -13,8 +13,8 @@ import pandas as pd
 import pathlib
 import time
 import matplotlib.pyplot as plt
-import Charts as c
-import Analytics as a
+import charts as c
+import analytics as a
 
 class Timer():
     """
@@ -305,7 +305,7 @@ class Simulation():
         termLoss10y = np.zeros(self.process.portfolioLife)
 
         for trial in range(0, self.process.trials):
-            import Analytics as a
+            import analytics as a
             print(str(trial+1) + " of " + str(self.process.trials) + " trials")
             self.timer.marker("\nstarting " + str(trial + 1) + ' of ' + str(self.process.trials))
             self.simdata.HD = np.zeros(shape=(self.simdata.rows, self.simdata.columns))

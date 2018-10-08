@@ -25,9 +25,9 @@
 
 """
 
-import Setup as s
-import Charts as c
-import Analytics as a
+import setup as s
+import charts as c
+import analytics as a
 import payoff as p
 
 

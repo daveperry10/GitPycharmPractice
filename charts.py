@@ -10,7 +10,7 @@ Charts Module:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import Setup as s
+import setup as s
 
 def plotCaseSchiller(df):
 
