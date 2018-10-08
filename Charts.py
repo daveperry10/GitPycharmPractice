@@ -241,7 +241,8 @@ class Chart():
         :param df: set of series already processed for plotting
         :param loc: location on grid
         :keyword title: subplot title if you need one
-        :keyword kind=line type of chart ('line' or 'hist')
+        :keyword kind: type of chart ('line' or 'hist')
+        :keyword style: color/style to be passed to df.plot()
         :return: return 1
         """
 
@@ -249,10 +250,12 @@ class Chart():
         kind = kwargs.get('kind', 'line')
         bins = kwargs.get('bins', 25)
         legend = kwargs.get('legend',True)
+        style = kwargs.get('style', '-')
+
         ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
 
         if kind == 'line':
-            df.plot(ax=ax, legend=legend)
+            df.plot(ax=ax, legend=legend, style=style)
         if kind == 'hist':
             df.hist(ax=ax, bins=bins)
             title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
