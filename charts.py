@@ -251,17 +251,26 @@ class Chart():
         bins = kwargs.get('bins', 25)
         legend = kwargs.get('legend',True)
         style = kwargs.get('style', '-')
+        linestyle = kwargs.get('linestyle', '-')
+        color = kwargs.get('color', 'k')
 
-        ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+        try:
+            ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+        except:
+            print('error: bad chart location')
+            return 1
+
+        if len(df.columns) == 1:
+            df.columns = [df.name]
 
         if kind == 'line':
-            df.plot(ax=ax, legend=legend, style=style)
+            df.plot(ax=ax, legend=legend, linestyle=linestyle, color=color)
         if kind == 'hist':
             df.hist(ax=ax, bins=bins)
             title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
 
         ax.set_title(title)
-        return 1
+        return 0
 
 
     def histGeneric(self, df, func, loc, **kwargs):

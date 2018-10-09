@@ -47,15 +47,83 @@ class Timer():
 
 
 class Asset():
-    def __init__(self, initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.1):
+
+    def __init__(self, initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.1, **kwargs):
+
+        """
+        :param initialInv:
+        :param investorShare:
+        :param discount:
+        :param oltv:
+        :param servicingFee:
+        :param performanceFee:
+        :param performanceHurdle:
+        :keyword prepayfile: [simperiods X 2] csv file.  Columns: years(float) and % prepaid (float)
+        :keyword default=False: apply default logic to holdings, calculate defaultable payoffs based on equity
+        """
+
         self.initialInv = initialInv
         self.investorShare = investorShare
         self.discount = discount
+        self.investmentSize = self.initialInv * (1 - self.discount)
         self.oltv = oltv
         self.servicingFee = servicingFee / 12
         self.performanceFee = performanceFee    # leave it annualized because it is used that way
         self.performanceHurdle = performanceHurdle
-        
+
+        self.prepayFile = pathlib.Path(kwargs.get('prepayfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv'))
+        self.defaultFile = pathlib.Path(kwargs.get('defaultfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv'))
+        self.mortgageBalanceFile = pathlib.Path(kwargs.get('mortgagebalancefile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/mortgagebalance.csv'))
+
+        self.prepaymentCurve = pd.read_csv(self.prepayFile, header=None).iloc[:, 1].cumsum()
+        self.defaultCurve = pd.read_csv(self.defaultFile, header=None).iloc[:, 1].cumsum()
+        self.mortgageBalanceCurve = pd.read_csv(self.mortgageBalanceFile, header=None).iloc[:, 1]
+
+    def payoffPct(self, origValue, newValue):
+        appreciationTotal = newValue - origValue + self.discount * origValue
+        shareOfAppr = self.investorShare * appreciationTotal
+
+        if (self.investmentSize + shareOfAppr > 0):
+            return (self.investmentSize + shareOfAppr) / self.investmentSize
+        else:
+            return 0
+
+    def defaultablePayoffPct(self, origValue, newValue, age):
+        """
+
+        1.  defaultRate * origValue is the amount of the vintage issuance that's defaulting at this time
+            if sim is in months, this should be a monthly rate
+        2.  that amount investors will receive on that amount is the max of homeowner equity and the SOTW payoffPct()
+        3.  on the rest, investors will receive SOTW payoffPct()
+
+        Equity Assumptions:
+            a. amort loaded from file
+            b. 80% LTV => original loan balance was origValue
+
+        Note payoffPct() returns an investment return on initial investment of (1 - discount) * initInvestmentPct.  Equity
+        coverage here needs to be scaled the same way.
+
+        :param origValue: original appraised home value (time j)
+        :param newValue: apraised home value at time of evaluation (time i)
+        :param age: months old, for calculating equity
+
+        :return:
+        """
+
+        factor = self.mortgageBalanceCurve.iloc[age]
+
+        origLoanBalance = origValue * self.oltv
+        currentLoanBalance = origLoanBalance * factor
+        equity = newValue - currentLoanBalance
+
+        # un-scale the normal payoff to put it in home price terms
+        oweToSOTW = self.investmentSize * self.payoffPct(origValue, newValue)
+
+        # now scale the result back down to investment size to put it in payoff terms
+        defaultPayoff = min(equity, oweToSOTW) / self.investmentSize
+
+        return defaultPayoff if defaultPayoff > 0 else 0
+
 class StochasticProcess():
     def __init__(self, trials, portfolioLife, assetLife, seed=0):
         self.trials = trials
@@ -95,6 +163,7 @@ class MeanRevertingProcess(StochasticProcess):
             paths.iloc[:, i] = S
 
         self.pricePaths = paths/S[0]
+        self.pricePaths.name = 'Home Price'
 
 
 
@@ -128,48 +197,49 @@ class Simulation():
         :param trials: number of full portfolio nav paths simulated
         :param ramp: list of incoming cash by period.  must be shorter than portfolioLife.
 
-        :keyword prepayfile: [simperiods X 2] csv file.  Columns: years(float) and % prepaid (float)
-        :keyword default=False: apply default logic to holdings, calculate defaultable payoffs based on equity
         :keyword debug=False: fills non-essential DFs -- cash flows, P&L, etc.
         :keyword termloss=True: calculate a loss at 10yr term based on min (home equity, payoff)
         :keyword dividend: float.  cumulative dividend.  Units = percent of NAV
         """
 
+        # Objects
         self.asset = asset
         self.process = process
+        self.simdata = self.SimData(self.process.portfolioLife + self.process.portfolioLife, self.process.portfolioLife)
+        self.timer = Timer()
+
+        # Fund stuff
         self.ramp = ramp
         self.dividend = kwargs.get('dividend', 0) / 12
 
-        # branching arguments
+        # Branching arguments
         self._debug = kwargs.get('debug', False)
         self._default = kwargs.get('default', False)
         self._termLoss = kwargs.get('termloss', True)
         self._flatdiv = kwargs.get('flatdiv', False)
 
-        self.timer = Timer()
-
-        self.prepayfile = pathlib.Path(kwargs.get('prepayfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv'))
-        self.defaultfile = pathlib.Path(kwargs.get('defaultfile', 'C:/Users/Dave/Documents/Sum/Analytics/Data/defaults.csv'))
-
-        self.prepaymentCurve = pd.read_csv(self.prepayfile, header=None).iloc[:, 1].cumsum()
-        self.defaultCurve = pd.read_csv(self.defaultfile, header=None).iloc[:, 1].cumsum()
-
+        # Chartable DataFrames.  Give them a name that they'll carry with them to the charts
         self.navPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.navPaths.name = 'NAV - contract'
         self.reinvestableCashFlowPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.reinvestableCashFlowPaths.name = 'Reinvestable Cash Flow'
         self.servicingFeePaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.servicingFeePaths.name = 'Servicing Fee'
         self.dividendPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.dividendPaths.name = 'Dividend'
         self.performanceFeePaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
-
+        self.performanceFeePaths.name = 'Performance Fee'
         self.dfNavPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
-
-        self.simdata = self.SimData(self.process.portfolioLife + self.process.portfolioLife, self.process.portfolioLife)
-
-        self.totalLoss = pd.Series(np.zeros(self.process.trials))
+        self.dfNavPaths.name = 'NAV - min(equity, contract)'
+        self.lossPaths = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.lossPaths.name = 'Loss - 1st Mtg Default'
+        self.termLoss10y = pd.DataFrame(np.zeros(shape=(self.process.portfolioLife, self.process.trials)))
+        self.termLoss10y.name = 'Loss - 10yr Final Term Default'
 
         for i in range(0, self.process.portfolioLife):
-            self.simdata.PP[i + 1: i + self.process.assetLife + 1, i] = self.prepaymentCurve
+            self.simdata.PP[i + 1: i + self.process.assetLife + 1, i] = self.asset.prepaymentCurve
             if self._default:
-                self.simdata.DF[i + 1: i + self.process.assetLife + 1, i] = self.defaultCurve
+                self.simdata.DF[i + 1: i + self.process.assetLife + 1, i] = self.asset.defaultCurve
 
     def top(self, num, bottom=False):
         # take the last row of navPaths and sort it
@@ -192,24 +262,21 @@ class Simulation():
         ch.save()
 
 
-    def analyze(self, evalperiods):
+    def analyze(self, df, evalperiods):
         """ 2, 5, and 10yr hist, mean, and sd for sim results
-         Produces histogram chart if self._charts is True
+         Produces histogram chart
          :param evalperiods: list of time periods for calculating summary statistics
          """
 
         ch = c.Chart(len(evalperiods), 1, sharex=True, sharey=False, title="NAV Distribution at Various Times")
 
         for p in evalperiods:
-            ch.chartBasic((self.navPaths.iloc[p, :] / 1e6) ** (1 / (p/12)) - 1, (evalperiods.index(p), 0), kind='hist',
-                          bins=np.arange(-1, 1, .02), title=str(p) +" Months")
-
-
+            bb = (df.iloc[p, :] / 1e6) ** (1 / (p / 12)) - 1
+            ch.chartBasic(bb, (evalperiods.index(p), 0), kind='hist', bins=np.arange(-1, 1, .02), title=str(p) +" Months")
         print('')
         for p in evalperiods:
-            df = (self.navPaths.iloc[p, :] / 1e6) ** (1 / (p/12)) - 1
-            print(str(p) + " Month Mean:" + str(round(df.mean(), 2)) + " SD=" + str(round(df.std(), 2)))
-
+            bb = (df.iloc[p, :] / 1e6) ** (1 / (p / 12)) - 1
+            print(str(p) + " Month Mean:" + str(round(bb.mean(), 2)) + " SD=" + str(round(bb.std(), 2)))
         ch.save()
 
     def buildHazardDistribution(self, hazardRate):
@@ -246,8 +313,6 @@ class Simulation():
             HPA[i] = rho * HPA[i-1] + (math.sqrt(1-rho**2)) * N[i]
             homePrices[i] = homePrices[i-1] * (1 + HPA[i])
         return 1
-
-
 
     def chart(self, **kwargs):
         ch = kwargs.get('chart', c.Chart(2, 1, sharex=False, sharey=False, title="SimHist"))
@@ -294,30 +359,20 @@ class Simulation():
 
         self.timer.marker("start sim")
 
-        # By Column/Vintage (j)
-        defaults = np.zeros(self.process.portfolioLife)
-        prepays = np.zeros(self.process.portfolioLife)
-        previous = np.zeros(self.process.portfolioLife)
-        remaining = np.zeros(self.process.portfolioLife)
-
         # By Row/Time (i)
         sharesOutstanding = np.zeros(self.process.portfolioLife)
         termLoss10y = np.zeros(self.process.portfolioLife)
 
         for trial in range(0, self.process.trials):
-            import analytics as a
             print(str(trial+1) + " of " + str(self.process.trials) + " trials")
             self.timer.marker("\nstarting " + str(trial + 1) + ' of ' + str(self.process.trials))
             self.simdata.HD = np.zeros(shape=(self.simdata.rows, self.simdata.columns))
             self.simdata.HD[0, 0] = self.ramp[0]
 
             sharesOutstanding[0] = self.ramp[0]
-            totalDivOwed = 0
-            totalDivPaid = 0
-            totalServicingFeeOwed = 0
-            totalServicingFeePaid = 0
-            totalPerformanceFeeOwed = 0
-            totalPerformanceFeePaid = 0
+
+            totalDivOwed, totalDivPaid, totalDivPaid,totalServicingFeeOwed, totalServicingFeePaid, \
+                totalPerformanceFeeOwed, totalPerformanceFeePaid  = [0 for i in range(0,7)]
 
             """PAYOFF MATRIX BUILD-UP"""
             self.timer.marker("set PO")
@@ -325,11 +380,12 @@ class Simulation():
                 for j in range(max(i-self.process.assetLife, 0), min(i, self.process.portfolioLife-1)+1): # follows live vintages
 
                     age = i-j
-                    self.simdata.DFPO[i, j] = a.defaultablePayoffPct(self.asset.initialInv, self.asset.investorShare,
-                                self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], self.asset.discount, age, self.asset.oltv) if ((i >= j) & (i - j < self.process.assetLife + 1)) else 0
-
-                    self.simdata.PO[i, j] = a.payoffPct(self.asset.initialInv, self.asset.investorShare,
-                                self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], self.asset.discount) if ((i >= j) & (i - j < self.process.assetLife + 1)) else 0
+                    if ((i >= j) & (i - j < self.process.assetLife + 1)):
+                        self.simdata.DFPO[i, j] = self.asset.defaultablePayoffPct(self.process.pricePaths[trial][j], self.process.pricePaths[trial][i], age)
+                        self.simdata.PO[i, j] = self.asset.payoffPct(self.process.pricePaths[trial][j], self.process.pricePaths[trial][i])
+                    else:
+                        self.simdata.DFPO[i, j] = 0
+                        self.simdata.PO[i, j] = 0
 
             """HOLDINGS MATRIX BUILD-UP"""
             self.timer.marker("set HD")
@@ -337,6 +393,9 @@ class Simulation():
 
             for i in range(1, self.process.portfolioLife):
                 #for each vintage that is active
+
+                previous, remaining, defaults, prepays = [np.zeros(self.process.portfolioLife) for i in range(0,4)]
+
                 for j in range(max(i - self.process.assetLife, 0), min(i, self.process.portfolioLife - 1) + 1):             # set holdings for i!=j
 
                     self.simdata.HD[i, j] = self.simdata.HD[j, j] * (1 - self.simdata.DF[i, j]) * (1 - self.simdata.PP[i, j]) # now HD is the orig bal that hasn't defaulted or prepaid
@@ -349,8 +408,7 @@ class Simulation():
 
                     """FINAL PAYMENT / 10 YEAR TERM LOGIC"""
                     if (i-j) == self.process.assetLife:                                 # find the final payoff for vintage j.
-                        termLoss10y[i] = prepays[j] * self.simdata.PO[i, j] - self.simdata.DFPO[i,j]  #final payment losses are the diff betw normal prepay amount and same amount in default scenario
-
+                        self.termLoss10y.iloc[i,trial] = prepays[j] * (self.simdata.PO[i, j] - self.simdata.DFPO[i,j])  #final payment losses are the diff betw normal prepay amount and same amount in default scenario
 
                 """INVESTMENT / REINVESTMENT LOGIC"""
                 a = np.dot(prepays, self.simdata.PO[i, :])                          # prepays pay the Payoff (PO) amount
@@ -407,8 +465,8 @@ class Simulation():
                     self.simdata.HD[i, i] = self.simdata.HD[i, i] + self.ramp[i]                            # add in new investment from the ramp (in original value terms)
                     sharesOutstanding[i] = sharesOutstanding[i] + self.ramp[i]/currentNAV                   # add to shares out
 
-                loss = np.dot(defaults, self.simdata.PO[i, :]) - np.dot(defaults, self.simdata.DFPO[i, :])  # loss is the difference between result in DF scenario and PO scenario
-                self.totalLoss[trial] = self.totalLoss[trial] + loss
+                self.lossPaths.iloc[i,trial] = np.dot(defaults, self.simdata.PO[i, :]) - np.dot(defaults, self.simdata.DFPO[i, :])  # loss is the difference between result in DF scenario and PO scenario
+
 
                 if self._debug:
                     print (i,
@@ -487,15 +545,3 @@ class Simulation():
             for i in range(max(j-9,0),j+1):
                 ages.iloc[j-i,j] = HD[j,i]
         return
-
-#                   #
-#   A/B Testing     #
-#                   #
-
-
-ABTest()
-#sim.timer.results()
-#sim.analyze(evalperiods=[12, 24, 60, 120])
-#sim.top(5)
-#sim.top(5, bottom=True)
-#print(sim.totalLoss)

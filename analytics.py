@@ -108,9 +108,10 @@ def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, 
     """
 
     origLoanBalance = origValue * oltv
-    currentLoanBalance = origLoanBalance # * (1 - age * 1/360)
+    currentLoanBalance = origLoanBalance * (1 - age * 1/360)
     equity = newValue - currentLoanBalance
     invSize = (1 - discount) * initInvestmentPct
+
 
     #un-scale the normal payoff to put it in home price terms
     oweToSOTW = invSize * payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount)
@@ -121,24 +122,6 @@ def defaultablePayoffPct(initInvestmentPct, investorShare, origValue, newValue, 
     return defaultPayoff if defaultPayoff > 0 else 0
     #return defaultRate * defaultPayoff + (1- defaultRate) * regularPayoff
 
-
-def payoffPct(initInvestmentPct, investorShare, origValue, newValue, discount):
-    """
-
-    :param initInvestmentPct: percentage of appraised home value funded by investor
-    :param investorShare: percentage of appreciation the investor earns
-    :param origValue: original appraised home value (time j)
-    :param newValue: apraised home value at time of evaluation (time i)
-    :param discount: initial appraisal discount
-    :return:
-    """
-    investment = (initInvestmentPct * origValue) * (1-discount)
-    appreciationTotal = newValue - origValue + discount * origValue
-    shareOfAppr = investorShare * appreciationTotal
-    if (investment + shareOfAppr > 0):
-        return (investment + shareOfAppr)/investment
-    else:
-        return 0
 
 def payoffIRR(initialInv, investorShare, apprAnnualized, life, discount):
     """
