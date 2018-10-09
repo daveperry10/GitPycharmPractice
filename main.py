@@ -116,7 +116,7 @@ def chartsmain():
 
     return
 
-from simulation import MeanRevertingProcess, Asset, Simulation
+from simulation import MeanRevertingProcess, Asset, Account, Simulation
 
 def abTest(seed):
     """
@@ -160,10 +160,12 @@ def abTest(seed):
 
 def chartAllSimResults(seed):
     ramp = [1e6]
-    process = MeanRevertingProcess(trials=1, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv", defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-high.csv",)
-    sim = Simulation(asset, process, ramp, debug=False, default=True, dividend=.06, termloss=True, flatdiv=True)
+
+    process = MeanRevertingProcess(trials=1, life=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
+    asset = Asset(initialInv=0.1,investorShare=0.35, discount=0.1, oltv=0.8, life=120, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-high.csv",)
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06)
+    sim = Simulation(asset, account, process, debug=False, default=True, termloss=True, flatdiv=True)
     sim.simulate()
 
     chart = c.Chart(5, 1, sharex=True, sharey=False, title="Simulation -- $1MM Investment, All Stats")
