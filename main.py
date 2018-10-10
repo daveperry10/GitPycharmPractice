@@ -133,7 +133,7 @@ def abTest(seed):
     process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.03, lam=0.05, sig=5, seed=seed)
     asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
                   prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv", defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    sim = Simulation(asset, process, ramp, debug=False, default=True, dividend=.06, termloss=True, flatdiv=True)
+    sim = Simulation(asset, process, ramp, debug=False, dividend=.06, termloss=True, flatdiv=True)
     sim.simulate()
     sim.navPaths.columns = ['6% Dividend']
     chart.chartBasic(sim.navPaths,(0,1), style='b-')
@@ -146,8 +146,8 @@ def abTest(seed):
     """SECOND RUN """
     process = MeanRevertingProcess(trials=trials, portfolioLife=144, assetLife=120, growthRate=0.03, lam=0.05, sig=5, seed=seed)
     asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    sim = Simulation(asset, process, ramp, debug=False, default=True, dividend=0, termloss=True, flatdiv=True)
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
+    sim = Simulation(asset, process, ramp, debug=False, dividend=0, termloss=True, flatdiv=True)
     sim.simulate()
     sim.navPaths.columns = ['No Dividend']
     sim.dividendPaths.columns = ['Div']; sim.performanceFeePaths.columns = ['Perf']; sim.servicingFeePaths.columns = ['Serv']
@@ -159,34 +159,34 @@ def abTest(seed):
     chart.chartBasic(sim.process.pricePaths, (2, 1), title="Price Path", legend=False, style='b-')
 
 def chartAllSimResults(seed):
-    ramp = [1e6]
+    ramp = [1e6] #, 1e6, 1e6, 1e6, 1e6, 1e6, 1e6, 1e6, 1e6, 1e6]
 
-    process = MeanRevertingProcess(trials=1, life=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1,investorShare=0.35, discount=0.1, oltv=0.8, life=120, prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",
+    process = MeanRevertingProcess(trials=1, life=144, growthRate=0.04, lam=0.05, sig=5, seed=seed)
+    asset = Asset(initialInv=0.1,investorShare=0.35, discount=0.1, oltv=1.0, life=120,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
                   defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-high.csv",)
-    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06)
-    sim = Simulation(asset, account, process, debug=False, default=True, termloss=True, flatdiv=True)
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06, flatdiv=True)
+    sim = Simulation(asset, account, process, debug=False)
     sim.simulate()
 
     chart = c.Chart(5, 1, sharex=True, sharey=False, title="Simulation -- $1MM Investment, All Stats")
 
     chart.chartBasic(sim.servicingFeePaths, (0, 1), legend=True, color =s.SOTW_RED, linestyle='-')
     chart.chartBasic(sim.performanceFeePaths, (0, 1), legend=True, color = s.SOTW_GREEN, linestyle='-')
-    chart.chartBasic(sim.dividendPaths, (0, 1), title='Cash Flow Uses', legend=True, color=s.SOTW_BLUE, linestyle='-')
+    chart.chartBasic(sim.dividendPaths, (0, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
 
-    chart.chartBasic(sim.lossPaths, (1, 1), legend=True, color=s.SOTW_YELLOW, linestyle='-')
-    #chart.chartBasic(sim.termLoss10y, (1, 1), legend=True, color=s.SOTW_GREEN, linestyle='-')
+    chart.chartBasic(sim.lossPaths, (3, 1), legend=True, color=s.SOTW_YELLOW, linestyle='-')
+    chart.chartBasic(sim.finalPayLossPaths, (3, 1), legend=True, color=s.SOTW_GREEN, linestyle='-', secondary=True)
 
     #chart.chartBasic(sim.reinvestableCashFlowPaths, (2, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
-    chart.chartBasic(sim.process.pricePaths, (3, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
+    chart.chartBasic(sim.process.pricePaths, (2, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
 
-    chart.chartBasic(sim.navPaths, (2, 1), legend=True, color = s.SOTW_RED, linestyle='-')
-    chart.chartBasic(sim.dfNavPaths, (2, 1), legend=True, color=s.SOTW_YELLOW, linestyle='--')
-
-
+    chart.chartBasic(sim.navPaths, (1, 1), legend=True, color = s.SOTW_RED, linestyle='-')
+    chart.chartBasic(sim.dfNavPaths, (1, 1), legend=True, color=s.SOTW_YELLOW, linestyle='--')
+    chart.chartBasic(sim.equityPaths, (1, 1), legend=True, color=s.SOTW_GREEN, linestyle='-')
 
     totalfee = c.pd.DataFrame((sim.servicingFeePaths['Servicing Fee']+sim.performanceFeePaths['Performance Fee']).cumsum())
-    totalfee.name = 'Total Fee'
+    totalfee.name = 'Cumulative Fee'
     chart.chartBasic(totalfee, (4, 1), legend=True, color=s.SOTW_RED, linestyle='-')
 
     c.plt.show()
@@ -194,11 +194,14 @@ def chartAllSimResults(seed):
 def simulation():
     seed=1
     ramp = [1e6]
-    process = MeanRevertingProcess(trials=5, portfolioLife=144, assetLife=120, growthRate=0.0, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    sim = Simulation(asset, process, ramp, debug=False, default=True, dividend=0, termloss=True, flatdiv=True)
+    process = MeanRevertingProcess(trials=1, life=144, growthRate=-0.04, lam=0.05, sig=5, seed=seed)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=1.1, life=120,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-high.csv",)
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06, flatdiv=True)
+    sim = Simulation(asset, account, process, debug=False, termloss=True)
     sim.simulate()
+
     #sim.timer.results()
     chart = c.Chart(2, 1, sharex=True, sharey=False, title="Fee Simulation")
     chart.chartBasic(sim.servicingFeePaths, (0, 1), title="Serv Fee", legend=False, style='b-')
@@ -211,7 +214,7 @@ def simulation():
 
 """  TOP-LEVEL CALLERS  """
 #abtest(0)
-chartAllSimResults(4)
+chartAllSimResults(2)
 #simulation()
 #chartsmain()
 

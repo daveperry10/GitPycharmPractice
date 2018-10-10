@@ -194,7 +194,7 @@ class Chart():
         sharey = kwargs.get('sharey', True)
         sharex = kwargs.get('sharex', True)
         self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        plt.subplots_adjust(hspace=0.3)
+        plt.subplots_adjust(hspace=0.2, top=0.95)
         self.fig.set_size_inches(7,9.5)
         self.title = kwargs.get('title', '')
         self.fig.suptitle(self.title, fontsize=12)
@@ -250,6 +250,7 @@ class Chart():
         kind = kwargs.get('kind', 'line')
         bins = kwargs.get('bins', 25)
         legend = kwargs.get('legend',True)
+        secondary  = kwargs.get('secondary',False)
         style = kwargs.get('style', '-')
         linestyle = kwargs.get('linestyle', '-')
         color = kwargs.get('color', 'k')
@@ -264,7 +265,10 @@ class Chart():
             df.columns = [df.name]
 
         if kind == 'line':
-            df.plot(ax=ax, legend=legend, linestyle=linestyle, color=color)
+            if secondary:
+                df.plot(ax=ax.twinx(), legend=legend, linestyle=linestyle, color=color)
+            else:
+                df.plot(ax=ax, legend=legend, linestyle=linestyle, color=color)
         if kind == 'hist':
             df.hist(ax=ax, bins=bins)
             title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
