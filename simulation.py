@@ -8,13 +8,11 @@
 """
 
 import numpy as np
-import math
 import pandas as pd
 import pathlib
 import time
-import matplotlib.pyplot as plt
 import charts as c
-import analytics as a
+import setup as s
 
 class Timer():
     """
@@ -212,8 +210,7 @@ class Simulation():
         # Branching arguments
         self._debug = kwargs.get('debug', False)
 
-        # Chartable DataFrames.  Give them a name that they'll carry with them to the charts
-
+        # Results DataFrames.  Name them for the charts
         self.navPaths, self.reinvestableCashFlowPaths,self.servicingFeePaths, self.dividendPaths, self.performanceFeePaths, \
         self.dfNavPaths, self.lossPaths, self.finalPayLossPaths, self.equityPaths = \
             [pd.DataFrame(np.zeros(shape=(self.process.life, self.process.trials))) for i in range(0,9)]
@@ -232,80 +229,34 @@ class Simulation():
             self.simdata.PP[i + 1: i + self.asset.life + 1, i] = self.asset.prepaymentCurve
             self.simdata.DF[i + 1: i + self.asset.life + 1, i] = self.asset.defaultCurve
 
-    def top(self, num, bottom=False):
-        # take the last row of navPaths and sort it
-        # find the index of the top values in the sort
-        # get the navPaths and pricePaths of those indices
-
-        sorted = self.navPaths.iloc[-1, :].sort_values()
-        indices = sorted.head(num).index if bottom else sorted.tail(num).index
-        title = "Bottom" if bottom else "Top"
-        navpaths = self.navPaths[indices]
-        pricepaths = self.process.pricePaths[indices]
-
-        ch = c.Chart(2, 1, sharex=False, sharey=False, title=title)
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.05 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.10 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
-        ch.chartBasic(pd.Series([1000000 * (1 + 0.15 / 12) ** x for x in range(0, self.process.portfolioLife)]), (0, 0))
-        ch.chartBasic(pd.Series([(1 + 0.02 / 12) ** x for x in range(0, self.process.portfolioLife)]), (1, 0))
-        ch.chartBasic(navpaths, (0, 0))
-        ch.chartBasic(pricepaths.iloc[:self.process.portfolioLife, :], (1, 0))
-        ch.save()
+    def describe(self):
+        mylist = [self.servicingFeePaths, self.performanceFeePaths, self.dividendPaths, self.navPaths, self.dfNavPaths,
+        self.equityPaths, self.process.pricePaths, self.lossPaths, self.finalPayLossPaths]
+    
+        a = pd.concat(mylist, axis=1, keys = [a.name for a in mylist])
+        b = a.iloc[[12, 24, 60, 119]]
+        c = b.stack(level=0)
+        d = c.sort_index(level=1)
+        d.index = d.index.swaplevel(0, 1)
+        e = d.T.describe().T
+        e.to_csv(s.OUTPUT_PATH / ("Sim Stats " + str(time.time()) + ".csv"))
 
 
-    def analyze(self, df, evalperiods):
+    def histogram(self, mylist, evalperiods, chart=False):
         """ 2, 5, and 10yr hist, mean, and sd for sim results
          Produces histogram chart
          :param evalperiods: list of time periods for calculating summary statistics
          """
 
-        ch = c.Chart(len(evalperiods), 1, sharex=True, sharey=False, title="NAV Distribution at Various Times")
+        if chart == True:
+            ch = c.Chart(len(evalperiods), 1, sharex=True, sharey=False, title="NAV Distribution at Various Times")
+            for item in mylist:
+                for p in evalperiods:
+                    bb = (item.iloc[p, :]) # ** (1 / (p / 12)) - 1
+                    ch.chartBasic(bb, (evalperiods.index(p), 0), kind='hist', bins=np.arange(-1, 1, .02), title=str(p) +" Months")
 
-        for p in evalperiods:
-            bb = (df.iloc[p, :] / 1e6) ** (1 / (p / 12)) - 1
-            ch.chartBasic(bb, (evalperiods.index(p), 0), kind='hist', bins=np.arange(-1, 1, .02), title=str(p) +" Months")
-        print('')
-        for p in evalperiods:
-            bb = (df.iloc[p, :] / 1e6) ** (1 / (p / 12)) - 1
-            print(str(p) + " Month Mean:" + str(round(bb.mean(), 2)) + " SD=" + str(round(bb.std(), 2)))
-        ch.save()
 
-    def buildHazardDistribution(self, hazardRate):
-
-        """
-        Hazard Rate Outcomes with random(0,1) and inverse of exponential cumulative distribution
-        Use in future default model.  Not used in Sim
-        """
-        fig, axes = plt.subplots(1, 1, sharex=True, sharey=True)
-        b = -np.log(1-np.random.random(10000))/0.24
-        b = b.clip(max=10)
-        pd.Series(b).hist(bins=10, ax=axes[1])
-        pd.Series(b).plot(kind='kde', secondary_y=True, ax = axes[1], xlim=[0,10])
-        axes[1].set_title("Home Sale Rate: 2% per month (10,000 Sims)")
-
-    def buildAutoCorrelatedNormalPrices(self, numRows):
-
-        """"
-        Correlation X1 and X2 are random normal.  X3 = rX1 + sqrt(1-r^2)*X2  || Autocorr:  use previous xi as X1
-        """
-
-        monthlyExpectedReturn = 0.03/12
-        monthlyVol = 0.05 / math.sqrt(12)
-        rho = .60
-
-        N = np.random.normal(monthlyExpectedReturn, monthlyVol, numRows)
-        HPA = np.zeros(numRows)
-        homePrices = pd.Series(np.zeros(numRows))
-
-        HPA[0] = N[1]
-        homePrices[0] = 1
-
-        for i in range(1, numRows):
-            HPA[i] = rho * HPA[i-1] + (math.sqrt(1-rho**2)) * N[i]
-            homePrices[i] = homePrices[i-1] * (1 + HPA[i])
-        return 1
-
-    def chart(self, **kwargs):
+    def chartNavPaths(self, **kwargs):
         ch = kwargs.get('chart', c.Chart(2, 1, sharex=False, sharey=False, title="SimHist"))
 
         # bogey lines
@@ -423,7 +374,7 @@ class Simulation():
                 else:
                     totalDivOwed = totalDivOwed + self.account.dividend * currentNAV * sharesOutstanding[i - 1]
 
-                fee = self.calculatePerformanceFee(currentNAV, i) * sharesOutstanding[i-1]
+                fee = self.calcPerformanceFee(currentNAV, i) * sharesOutstanding[i - 1]
                 totalPerformanceFeeOwed = totalPerformanceFeeOwed + fee
 
                 servicingFeePayment = min(totalServicingFeeOwed - totalServicingFeePaid, reinvestableCashFlow)
@@ -440,14 +391,9 @@ class Simulation():
                 reinvestableCashFlow = reinvestableCashFlow - performanceFeePayment
 
                 reinvestment = reinvestableCashFlow
-                print(str(i), "performanceFeePayment: " + str(round(performanceFeePayment, 3)),
-                      "calculated fee: " + str(round(fee, 3)),"reinvestment: " + str(round(reinvestment, 3)))
-
-                                                                       # should't be < zero if above logic is right
 
                 self.simdata.HD[i, i] = reinvestment                                                        # reinvest the total proceeds of defaults and prepays
                 self.simdata.reinvestableCashflow[i] = a + b - d
-                # record the pre-waterfall cashflow for reporting
                 self.simdata.performanceFee[i] = performanceFeePayment
                 self.simdata.servicingFee[i] = servicingFeePayment
                 self.simdata.dividend[i] = divPayment
@@ -488,7 +434,6 @@ class Simulation():
             self.navPaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.process.life].T / sharesOutstanding
             self.dfNavPaths.iloc[:, trial] = self.simdata.DFNV.sum(axis=1)[:self.process.life].T / sharesOutstanding
             self.equityPaths.iloc[:, trial] = self.simdata.EQNV.sum(axis=1)[:self.process.life].T / sharesOutstanding
-
             self.reinvestableCashFlowPaths.iloc[:, trial] = self.simdata.reinvestableCashflow
             self.servicingFeePaths.iloc[:, trial] = self.simdata.servicingFee
             self.dividendPaths.iloc[:, trial] = self.simdata.dividend
@@ -498,12 +443,10 @@ class Simulation():
 
         return
 
-    def calculatePerformanceFee(self, currentNAV, currentPeriod):
+    def calcPerformanceFee(self, currentNAV, currentPeriod):
 
         """
-
         Issue -- what NAV does a new investor get in month 2?
-
         Caluculate the performance fee.  Handle it separately for each investment amount in the ramp[] vector
         :param currentNAV: NAV in simulation period
         :param currentPeriod: simulation period
@@ -511,30 +454,9 @@ class Simulation():
         """
 
         origNAV = 1
-        sharesOwned = 1000000
         years = (currentPeriod + 1)/12
-        navReturnOnShares = (currentNAV/origNAV) ** (1/years) -1 if years > 1 else 0   # (currentNAV/origNAV -1)
-
+        navReturnOnShares = (currentNAV/origNAV) ** (1/years) - 1 if years > 1 else 0
         totalReturnOnShares = navReturnOnShares + self.account.dividend
         feePerShare = max((totalReturnOnShares - self.account.performanceHurdle) * self.account.performanceFee, 0)/12
 
-        #print(str(currentPeriod), "nav return: " + str(round(navReturnOnShares,2)), "distribution return: " + str(round(distributionReturnOnShares,2)),
-        #      "fee per share: " + str(round(feePerShare,4)))
-
-        return feePerShare                 # apply this fee directly to reinvestable cashflow
-
-    def getPortfolioHoldingsByAge(self, LIFE, PERIODS, HD):
-
-        """ Simple, chartable MxN sequence of portfolio proportions by loan age over time
-        Not tested """
-
-        ages = pd.DataFrame(np.zeros(shape=(10, 100)))
-        ages = np.zeros(shape=(LIFE, PERIODS))
-        for j in range(0, PERIODS):
-            for i in range(max(j-LIFE +1,0), j+1):
-                ages[j-i,j] = HD[j,i]
-
-        for j in range(0,90):
-            for i in range(max(j-9,0),j+1):
-                ages.iloc[j-i,j] = HD[j,i]
-        return
+        return feePerShare

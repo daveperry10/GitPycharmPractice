@@ -261,10 +261,9 @@ class Chart():
             print('error: bad chart location')
             return 1
 
-        if len(df.columns) == 1:
-            df.columns = [df.name]
-
         if kind == 'line':
+            if len(df.columns) == 1:
+                df.columns = [df.name]
             if secondary:
                 df.plot(ax=ax.twinx(), legend=legend, linestyle=linestyle, color=color)
             else:
