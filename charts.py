@@ -272,7 +272,7 @@ class Chart():
             df.hist(ax=ax, bins=bins)
             title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
 
-        ax.set_title(title)
+        ax.set_title(title, fontsize=9)
         return 0
 
 
