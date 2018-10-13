@@ -126,7 +126,7 @@ class Asset():
 
         # now scale the result back down to investment size to put it in payoff terms
         defaultPayoff = max(min(equity, oweToSOTW) / self.investmentSize,0)
-        equityPayoff = equity/self.investmentSize
+        equityPayoff = (newValue - currentLoanBalance)/newValue
 
         return defaultPayoff, equityPayoff
 
@@ -167,12 +167,9 @@ class MeanRevertingProcess(StochasticProcess):
                 S[t] = S[t - 1] + lam * (mu[t] - S[t - 1]) + sig * N[t]
             paths.iloc[:, i] = S
 
-
+        #self.pricePaths = pd.DataFrame(np.ones(shape=(numRows, self.trials)))  #for debugging
         self.pricePaths = paths/S[0]
-
-        self.pricePaths = pd.DataFrame(np.ones(shape=(numRows, self.trials)))
         self.pricePaths.name = 'Home Price'
-
 
 
 class Simulation():
@@ -187,18 +184,20 @@ class Simulation():
             self.HD, self.PP, self.DF, self.PO, self.DFPO, self.EQPO, self.NV, self.DFNV, self.EQNV = \
                 (np.zeros(shape=(rows, columns)) for i in range(9))
 
-            self.debugDump = pd.DataFrame(np.zeros(shape=(columns, 27)),
-                columns=['Original Balance', 'Orig Bal', 'Defaulted Orig Bal', 'Prepaid Orig Bal', 'Remaining Orig Bal', 'Orig Value',
-                         'Defaulted Value', 'Prepaid Value', 'Remaining Value', 'Home Price', 'Beginning NAV', 'Reinvestable CF', 'S Fee',
-                         'S Fee Owed', 'S Fee Paid', 'S Fee Payment', 'Div', 'Div Owed', 'Div Paid', 'Div Payment', 'Perf Fee',
-                         'Perf Fee Owed', 'Perf Fee Paid', 'Perf Fee Payment', 'Reinvestment', 'Residual CF', 'Total Inv CF'])
+            self.debugDump = pd.DataFrame(np.zeros(shape=(columns, 26)),
+                columns=['Orig Bal', 'Previous Bal', 'Defaulted Orig Bal', 'Prepaid Orig Bal', 'Remaining Orig Bal',
+                         'Beginning NAV', 'Home Price', 'Account Value', 'Defaulted Value', 'Prepaid Value',
+                         'Reinvestable CF', 'S Fee', 'S Fee Owed', 'S Fee Paid', 'S Fee Payment',
+                         'Div', 'Div Owed', 'Div Paid', 'Div Payment',
+                         'Perf Fee', 'Perf Fee Owed', 'Perf Fee Paid', 'Perf Fee Payment', 'Reinvestment',
+                         'Residual CF', 'Total Inv CF'])
 
     class SimResults():
         def __init__(self, processLife, trials):
             # Results DataFrames.  Name them for the charts
             self.navPaths, self.residualCashFlowPaths, self.servicingFeePaths, self.dividendPaths, self.performanceFeePaths, \
-                self.dfNavPaths, self.lossPaths, self.finalPayLossPaths, self.equityPaths,self.accountValuePaths = \
-                [pd.DataFrame(np.zeros(shape=(processLife, trials))) for i in range(0,10)]
+                self.dfNavPaths, self.lossPaths, self.finalPayLossPaths, self.equityPaths,self.accountValuePaths, self.totalInvestorCashFlow = \
+                [pd.DataFrame(np.zeros(shape=(processLife, trials))) for i in range(0,11)]
 
             self.navPaths.name = 'NAV - contract'
             self.residualCashFlowPaths.name = 'Residual Cash Flow'
@@ -210,8 +209,9 @@ class Simulation():
             self.finalPayLossPaths.name = 'Credit Loss - 10yr Final Term Default'
             self.equityPaths.name = 'Homeowner Equity'
             self.accountValuePaths.name = 'Account Value'
+            self.totalInvestorCashFlow.name = 'Total Investor Cash Flow'
             self.pathList = [self.servicingFeePaths, self.performanceFeePaths, self.dividendPaths, self.navPaths,
-                             self.dfNavPaths, self.equityPaths, self.lossPaths, self.finalPayLossPaths,self.accountValuePaths]
+                             self.dfNavPaths, self.equityPaths, self.lossPaths, self.finalPayLossPaths,self.accountValuePaths,self.totalInvestorCashFlow]
 
     def __init__(self, asset, account, process, **kwargs):
         """
@@ -352,6 +352,7 @@ class Simulation():
                 for j in range(max(i - self.asset.life, 0), min(i, self.process.life - 1) + 1):             # set holdings for i!=j
 
                     # find defaulted, prepaid amount of each vintage.
+                    begin[j] = self.simdata.HD[j, j]
                     defaults[j] = self.simdata.HD[j, j] * (self.simdata.DF[i, j] - self.simdata.DF[i - 1, j])
                     prepays[j] = self.simdata.HD[j, j] * (self.simdata.PP[i, j] - self.simdata.PP[i - 1, j])
                     self.simdata.HD[i, j] = self.simdata.HD[i-1, j] - defaults[j] - prepays[j]
@@ -401,6 +402,7 @@ class Simulation():
                 else:
                     self.simresults.residualCashFlowPaths.iloc[i, trial] = reinvestableCashFlow
                     totalInvestorCashFlow = totalInvestorCashFlow + divPayment + reinvestableCashFlow
+                    self.simresults.totalInvestorCashFlow.iloc[i, trial] = totalInvestorCashFlow
 
                 sharesOutstanding[i] = sharesOutstanding[i-1]
                 if len(self.account.ramp) > i:
@@ -409,23 +411,27 @@ class Simulation():
 
                 self.simresults.lossPaths.iloc[i,trial] = np.dot(defaults, self.simdata.PO[i, :]) - np.dot(defaults, self.simdata.DFPO[i, :])  # loss is the difference between result in DF scenario and PO scenario
 
+                self.simdata.NV[i, :] = self.simdata.PO[i, :] * self.simdata.HD[i, :]
+                self.simresults.equityPaths.iloc[i, trial] = np.dot(self.simdata.EQPO[i,:], self.simdata.HD[i,:]) / self.simdata.HD[i,:].sum()  #weighted average equity
+
                 if self._debug:
-                    self.simdata.debugDump.iloc[i,:]['Orig Bal'] = sharesOutstanding[i]
-                    self.simdata.debugDump.iloc[i, :]['Beginning NAV'] = nav
-                    self.simdata.debugDump.iloc[i, :]['Remaining Orig Bal'] = self.simdata.HD[i, :].sum()
-                    self.simdata.debugDump.iloc[i, :]['Home Price'] = self.process.pricePaths[trial][i]
-                    self.simdata.debugDump.iloc[i, :]['Account Value'] = self.simdata.NV.sum(axis=1)[i]
 
-                    self.simdata.debugDump.iloc[i, :]['Defaulted Orig Bal'] = defaults.sum()
-                    self.simdata.debugDump.iloc[i, :]['Prepaid Orig Bal'] = prepays.sum()
+                    """ original balances """
+                    self.simdata.debugDump.iloc[i,:]['Orig Bal'] = sharesOutstanding[i]                    # Total Shares
+                    self.simdata.debugDump.iloc[i, :]['Previous Bal'] = begin.sum()                        # Beginning Orig Bal
+                    self.simdata.debugDump.iloc[i, :]['Defaulted Orig Bal'] = defaults.sum()               # Defaulted Orig Bal
+                    self.simdata.debugDump.iloc[i, :]['Prepaid Orig Bal'] = prepays.sum()                  # Prepaid Orig Bal
+                    self.simdata.debugDump.iloc[i, :]['Remaining Orig Bal'] = self.simdata.HD[i, :].sum()  # Remaining Orig Bal
 
-                    self.simdata.debugDump.iloc[i, :]['Orig Value'] = begin.sum()
-                    self.simdata.debugDump.iloc[i, :]['Defaulted Value'] = np.dot(defaults, self.simdata.DFPO[i, :])
+                    """ valuation """
+                    self.simdata.debugDump.iloc[i, :]['Beginning NAV'] = nav                               # NAV per share (Previous)
+                    self.simdata.debugDump.iloc[i, :]['Home Price'] = self.process.pricePaths[trial][i]    # Home Price
+                    self.simdata.debugDump.iloc[i, :]['Account Value'] = self.simdata.NV.sum(axis=1)[i]    # Total Account Value
+                    self.simdata.debugDump.iloc[i, :]['Defaulted Value'] = np.dot(defaults, self.simdata.DFPO[i, :])  # Recovery proceeds of defaults
                     self.simdata.debugDump.iloc[i, :]['Prepaid Value'] = np.dot(prepays, self.simdata.PO[i, :])
-                    #self.simdata.debugDump.iloc[i, :]['Remaining Value'] = np.dot(remaining, self.simdata.PO[i, :])
 
+                    """ payment waterfall """
                     self.simdata.debugDump.iloc[i, :]['Reinvestable CF'] = startingReinvestableCashFlow
-
                     self.simdata.debugDump.iloc[i, :]['S Fee'] = self.account.servicingFee * nav * sharesOutstanding[i - 1]
                     self.simdata.debugDump.iloc[i, :]['S Fee Owed'] = totalServicingFeeOwed
                     self.simdata.debugDump.iloc[i, :]['S Fee Paid'] = totalServicingFeePaid
@@ -436,22 +442,20 @@ class Simulation():
                     self.simdata.debugDump.iloc[i, :]['Div Paid'] =totalDivPaid
                     self.simdata.debugDump.iloc[i, :]['Div Payment'] =divPayment
 
-                    self.simdata.debugDump.iloc[i, :]['Perf Fee'] = perfFee
+                    self.simdata.debugDump.iloc[i, :]['Perf Fee'] = perfFee * nav * sharesOutstanding[i - 1]
                     self.simdata.debugDump.iloc[i, :]['Perf Fee Owed'] = totalPerformanceFeeOwed
                     self.simdata.debugDump.iloc[i, :]['Perf Fee Paid'] = totalPerformanceFeePaid
                     self.simdata.debugDump.iloc[i, :]['Perf Fee Payment'] = performanceFeePayment
                     self.simdata.debugDump.iloc[i, :]['Reinvestment'] = self.simdata.HD[i, i]
 
                     self.simdata.debugDump.iloc[i, :]['Residual CF'] = self.simresults.residualCashFlowPaths.iloc[i, trial]
-                    self.simdata.debugDump.iloc[i, :]['Total Inv CF'] = totalInvestorCashFlow
-
-                self.simdata.NV[i,:] = self.simdata.PO[i,:] * self.simdata.HD[i,:]
+                    self.simdata.debugDump.iloc[i, :]['Total Inv CF'] = self.simresults.totalInvestorCashFlow.iloc[i, trial]
                                                                                              #end i loop
+
             """NAV CALCULATION"""
             self.timer.marker("set NV")
             #self.simdata.NV = self.simdata.PO * self.simdata.HD
             self.simdata.DFNV = self.simdata.DFPO * self.simdata.HD
-            self.simdata.EQNV = self.simdata.EQPO * self.simdata.HD
 
             self.timer.marker("set trial records")
 
@@ -459,14 +463,9 @@ class Simulation():
             self.simresults.accountValuePaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.process.life].T
             self.simresults.navPaths.iloc[:, trial] = self.simdata.NV.sum(axis=1)[:self.process.life].T / sharesOutstanding
             self.simresults.dfNavPaths.iloc[:, trial] = self.simdata.DFNV.sum(axis=1)[:self.process.life].T / sharesOutstanding
-            self.simresults.equityPaths.iloc[:, trial] = self.simdata.EQNV.sum(axis=1)[:self.process.life].T / sharesOutstanding
 
             if self._debug:
-                try:
-                    self.simdata.debugDump.to_csv(s.OUTPUT_PATH / "dump.csv")
-                except:
-                    print("close the file")
-                    pass
+                self.simdata.debugDump.to_csv(s.OUTPUT_PATH / ("dump" + str(time.time()) + ".csv"))
 
             self.timer.marker("finished " + str(trial + 1) + ' of ' + str(self.process.trials))
         return
@@ -511,15 +510,18 @@ class Simulation():
         chart.chartBasic(self.simresults.servicingFeePaths, (0, 1), legend=True, color=s.SOTW_RED, linestyle='-')
         chart.chartBasic(self.simresults.performanceFeePaths, (0, 1), legend=True, color=s.SOTW_GREEN, linestyle='-')
         chart.chartBasic(self.simresults.dividendPaths, (0, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
+        chart.chartBasic(self.simresults.residualCashFlowPaths, (0, 1), legend=True, color=s.SOTW_YELLOW, linestyle='--')
+
         chart.chartBasic(self.simresults.navPaths, (1, 1), legend=True, color=s.SOTW_RED, linestyle='-')
         chart.chartBasic(self.simresults.dfNavPaths, (1, 1), legend=True, color=s.SOTW_YELLOW, linestyle='--')
         chart.chartBasic(self.simresults.equityPaths, (1, 1), legend=True, color=s.SOTW_GREEN, linestyle='-')
         chart.chartBasic(self.process.pricePaths, (2, 1), legend=True, color=s.SOTW_BLUE, linestyle='-')
 
-        ddd = self.simresults.residualCashFlowPaths.cumsum(); ddd.name='cumulative residual cash flow'
-        eee = ddd + self.simresults.accountValuePaths; eee.name='value + resid'
+        ddd = self.simresults.residualCashFlowPaths.cumsum(); ddd.name='Resid Cash Flow (C)'
+        eee = self.simresults.accountValuePaths + self.simresults.totalInvestorCashFlow; eee.name='Acct Value + Total CF'
         chart.chartBasic(ddd, (3, 1), legend=True, color=s.SOTW_YELLOW, linestyle='-')
         chart.chartBasic(eee, (3, 1), legend=True, color='sienna', linestyle='-.')
+        chart.chartBasic(self.simresults.totalInvestorCashFlow, (3, 1), legend=True, color='mediumslateblue', linestyle='--')
         chart.chartBasic(self.simresults.accountValuePaths, (3, 1), legend=True, color='plum', linestyle='-')
 
         #chart.chartBasic(self.simresults.lossPaths, (3, 1), legend=True, color=s.SOTW_YELLOW, linestyle='-')

@@ -177,14 +177,14 @@ def simMultiplePaths():
 
 def simOnePath():
     seed=1
-    #ramp = [2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0]
-    ramp = [1e7]
-    process = MeanRevertingProcess(trials=1, life=144, growthRate=.02, lam=0.05, sig=5, seed=2)
-    asset = Asset(initialInv=0.1, investorShare=0.1, discount=0.0, oltv=0.8, life=120,
+    ramp = [2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0]
+    #ramp = [1e7]
+    process = MeanRevertingProcess(trials=1, life=144, growthRate=.02, lam=0.05, sig=5, seed=5)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=120,
                   prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-test.csv",
                   defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv"
                   )
-    account = Account(ramp, servicingFee=0.00, performanceFee=0.0, performanceHurdle=0.0, dividend=.0, flatdiv=True, reinvest=False)
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.04, flatdiv=True, reinvest=False)
     sim = Simulation(asset, account, process, debug=True)
     sim.simulate()
     sim.chartAllSimResults()
