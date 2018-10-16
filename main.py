@@ -160,33 +160,31 @@ def simABTest(seed):
 
     chart.chartBasic(sim.process.pricePaths, (2, 1), title="Price Path", legend=False, style='b-')
 
-def simMultiplePaths():
-    seed=1
+def simMultiplePaths(trials):
     ramp = [1e6]
-    process = MeanRevertingProcess(trials=10, life=144, growthRate=.02, lam=0.05, sig=5, seed=2)
+    process = MeanRevertingProcess(trials=trials, life=144, growthRate=.04, lam=0.05, sig=4, seed=4)
     asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=120,
                   prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
                   defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06, flatdiv=True)
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06, flatdiv=True, reinvest=False)
     sim = Simulation(asset, account, process, debug=False)
     sim.simulate()
-    sim.chartAllSimResults()
     sim.describe()
     sim.histogram(119, pathlist=[sim.simresults.servicingFeePaths, sim.simresults.performanceFeePaths, sim.simresults.navPaths, sim.simresults.lossPaths])
     plt.show()
 
 def simOnePath():
     seed=1
-    ramp = [2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0, 2e6, 0, 0]
+    ramp = [2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0]
     #ramp = [1e7]
-    process = MeanRevertingProcess(trials=1, life=144, growthRate=.02, lam=0.05, sig=5, seed=5)
+    process = MeanRevertingProcess(trials=1, life=120,  growthRate=.04,  lam=0.05,  sig=5, seed=6)
     asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=120,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-test.csv",
-                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv"
-                  )
-    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.04, flatdiv=True, reinvest=False)
-    sim = Simulation(asset, account, process, debug=True)
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
+    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.08, dividend=.06, flatdiv=True, reinvest=False)
+    sim = Simulation(asset, account, process, debug=False)
     sim.simulate()
+    sim.describe()
     sim.chartAllSimResults()
     plt.show()
 
@@ -198,10 +196,10 @@ def simOnePath():
 #simABTest(0)
 
 """ Single Path:  5-Chart Performance"""
-simOnePath()
+#simOnePath()
 
 """Multiple Paths:  Stats and Histograms"""
-#simMultiplePaths()
+simMultiplePaths(100)
 
 """Do all of the SQL DB Charting """
 #chartsmain()
