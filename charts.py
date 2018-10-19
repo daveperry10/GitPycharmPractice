@@ -194,13 +194,16 @@ class Chart():
         sharey = kwargs.get('sharey', True)
         sharex = kwargs.get('sharex', True)
         hspace = kwargs.get('hspace', 0.2)
+        top = kwargs.get('top', 0.95)
+        bottom = kwargs.get('bottom', 0.14)
+
         self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        plt.subplots_adjust(hspace=hspace, top=0.95, bottom=.14)
+        plt.subplots_adjust(hspace=hspace, top=top, bottom=bottom)
         self.fig.set_size_inches(7,9)
         self.title = kwargs.get('title', '')
         self.fig.suptitle(self.title, fontsize=12)
         self.path = s.OUTPUT_PATH
-        self.chartfilename = self.title
+        self.chartfilename = kwargs.get('chartfilename', self.title)
         self.datafile = ""
 
     def save (self):
@@ -252,7 +255,6 @@ class Chart():
         bins = kwargs.get('bins', 25)
         legend = kwargs.get('legend',True)
         secondary  = kwargs.get('secondary',False)
-        style = kwargs.get('style', '-')
         linestyle = kwargs.get('linestyle', '-')
         color = kwargs.get('color', 'k')
 
@@ -263,8 +265,9 @@ class Chart():
             return 1
 
         if kind == 'line':
-            if len(df.columns) == 1:
-                df.columns = [df.name]
+            if df._typ != 'series':
+                if len(df.columns) == 1:
+                    df.columns = [df.name]
             if secondary:
                 df.plot(ax=ax.twinx(), legend=legend, linestyle=linestyle, color=color)
             else:
@@ -272,7 +275,7 @@ class Chart():
         if kind == 'hist':
             df.hist(ax=ax, bins=bins)
             #title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
-            title = title + " Mean:" + str(df.mean()) + " SD=" + str(df.std())
+            title = title + " Mean:" + str(round(df.mean(),2)) + " SD=" + str(round(df.std(),2))
 
         ax.set_title(title, fontsize=9)
         return 0

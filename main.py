@@ -122,70 +122,78 @@ from simulation import MeanRevertingProcess, Asset, Account, Simulation
 
 def simABTest(seed):
     """
-    Show NAV Path, Cash Flow Path, and Price Path for simulation runs with one or more parameter changed on
+    Show Various Sim Results for two simulation runs with one or more parameter changed on
     the second run.
     *** Charts are on the same axis ***
     Notes:  Trials must be 1.
     :return:
     """
-    ramp = [1e6] # (only works on a single investment for now)
-    chart = c.Chart(3,1, sharex=True, sharey=False, title="Sim: single price path, Div vs. No Div")
+    chart = c.Chart(3,1, sharex=True, sharey=False, title="Sim: A/B Test", bottom=.21, top=.935)
 
-    """FIRST RUN"""
-    process = MeanRevertingProcess(trials1, portfolioLife=144, assetLife=120, growthRate=0.02, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-deck.csv", defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    sim = Simulation(asset, process, ramp, debug=False, dividend=.06, termloss=True, flatdiv=True)
-    sim.simulate()
-    sim.navPaths.columns = ['6% Dividend']
-    chart.chartBasic(sim.navPaths,(0,1), style='b-')
+    """ FIRST RUN"""
+    ramp = [20e6]
+    account = Account(ramp, servicingFee=0.02, performanceFee=0.2, performanceHurdle=0.08, dividend=.0, frequency=4, flatdiv=True, reinvest=False)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=account.frequency*10,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-chris-q.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-zero-q.csv")
+    process = MeanRevertingProcess(trials=1, life=41,  growthRate=.075, frequency=account.frequency,  lam=.1,  sig=10, seed=1)
+    sim1 = Simulation(asset, account, process, debug=False)
+    sim1.simulate()
+    chart.chartBasic(sim1.simresults.totalInvestorValue,(0,1), color='cadetblue', linestyle='-')
+    chart.chartBasic(sim1.simresults.residualCashFlow, (1, 1), legend=True, color='cadetblue', linestyle='-')
 
-    sim.dividendPaths.columns = ['Div'];sim.performanceFeePaths.columns=['Perf'];  sim.servicingFeePaths.columns=['Serv']
-    chart.chartBasic(sim.dividendPaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b-')
-    chart.chartBasic(sim.performanceFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b--')
-    chart.chartBasic(sim.servicingFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='b-.')
+    """ SECOND RUN """
+    ramp = [20e6]
+    account = Account(ramp, servicingFee=0.02, performanceFee=0.2, performanceHurdle=0.08, dividend=.0, frequency=4, flatdiv=True, reinvest=False)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=account.frequency*10,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-chris-q.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-zero-q.csv")
+    process = MeanRevertingProcess(trials=1, life=41,  growthRate=.075, frequency=account.frequency,  lam=.1,  sig=10, seed=9,
+                                   pricefile='C:/Users/Dave/Documents/Sum/Analytics/Data/homeprices-chris-q.csv')
+    sim2 = Simulation(asset, account, process, debug=False)
+    sim2.simulate()
+    chart.chartBasic(sim2.simresults.totalInvestorValue,(0,1), color='brown', linestyle='-', title='Total Investor Value')
+    chart.chartBasic(sim2.simresults.residualCashFlow, (1, 1), title="Cash Flow Paths", legend=True, color='brown', linestyle='-')
 
-    """SECOND RUN """
-    process = MeanRevertingProcess(trials=1, portfolioLife=144, assetLife=120, growthRate=0.03, lam=0.05, sig=5, seed=seed)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    sim = Simulation(asset, process, ramp, debug=False, dividend=0, termloss=True, flatdiv=True)
-    sim.simulate()
-    sim.navPaths.columns = ['No Dividend']
-    sim.dividendPaths.columns = ['Div']; sim.performanceFeePaths.columns = ['Perf']; sim.servicingFeePaths.columns = ['Serv']
-    chart.chartBasic(sim.navPaths, (0, 1), title="NAV Paths", style='r-')
-    #chart.chartBasic(sim.dividendPaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r-')
-    chart.chartBasic(sim.performanceFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r--')
-    chart.chartBasic(sim.servicingFeePaths.iloc[1:, :], (1, 1), title="Cash Flow Paths", legend=True, style='r-.')
+    """ PRICE INPUTS """
+    chart.chartBasic(sim1.process.pricePaths, (2, 1), legend=False, color='cadetblue', linestyle='-')
+    chart.chartBasic(sim2.process.pricePaths, (2, 1), title="Price Path", legend=False, color='brown', linestyle='-')
 
-    chart.chartBasic(sim.process.pricePaths, (2, 1), title="Price Path", legend=False, style='b-')
+    sim1.fillTextBox(chart, 0.135, 0.12)
+    sim2.fillTextBox(chart, 0.135, 0.05)
+
+    plt.show()
 
 def simMultiplePaths(trials):
     ramp = [1e6]
-    process = MeanRevertingProcess(trials=trials, life=144, growthRate=.04, lam=0.05, sig=4, seed=4)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=120,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
-                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.0, dividend=.06, flatdiv=True, reinvest=False)
+
+    account = Account(ramp, servicingFee=0.02, performanceFee=0.2, performanceHurdle=0.08, dividend=0.0, frequency=4, flatdiv=True, reinvest=False)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=account.frequency*10,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-chris-q.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-zero-q.csv")
+    process = MeanRevertingProcess(trials=trials, life=41,  growthRate=.02, frequency=account.frequency,  lam=0.25,  sig=10, seed=9)
+
     sim = Simulation(asset, account, process, debug=False)
     sim.simulate()
-    sim.describe()
-    sim.histogram(119, pathlist=[sim.simresults.servicingFeePaths, sim.simresults.performanceFeePaths, sim.simresults.navPaths, sim.simresults.lossPaths])
+    sim.describe([40])
+    sim.histogram(40, [sim.simresults.totalInvestorValue, sim.simresults.totalFee])
     plt.show()
 
 def simOnePath():
-    seed=1
-    ramp = [2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0]
-    #ramp = [1e7]
-    process = MeanRevertingProcess(trials=1, life=120,  growthRate=.04,  lam=0.05,  sig=5, seed=6)
-    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=120,
-                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-all.csv",
-                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-low.csv")
-    account = Account(ramp, servicingFee=0.01, performanceFee=0.1, performanceHurdle=0.08, dividend=.06, flatdiv=True, reinvest=False)
+    #ramp = [2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0, 2e5, 0, 0]
+
+    ramp = [20e6]
+    account = Account(ramp, servicingFee=0.0, performanceFee=0.2, performanceHurdle=0.08, dividend=.0, frequency=4, flatdiv=True, reinvest=False)
+    asset = Asset(initialInv=0.1, investorShare=0.35, discount=0.1, oltv=0.8, life=account.frequency*10,
+                  prepayfile="C:/Users/Dave/Documents/Sum/Analytics/Data/prepay-chris-q.csv",
+                  defaultfile="C:/Users/Dave/Documents/Sum/Analytics/Data/defaults-zero-q.csv")
+    process = MeanRevertingProcess(trials=1, life=41,  growthRate=.075, frequency=account.frequency,  lam=.1,  sig=10, seed=9)
+                                   #pricefile='C:/Users/Dave/Documents/Sum/Analytics/Data/homeprices-chris-q.csv')
+
     sim = Simulation(asset, account, process, debug=False)
     sim.simulate()
-    sim.describe()
     sim.chartAllSimResults()
+    sim.chartNavPaths()
     plt.show()
 
 
@@ -199,7 +207,7 @@ def simOnePath():
 #simOnePath()
 
 """Multiple Paths:  Stats and Histograms"""
-simMultiplePaths(100)
+simMultiplePaths(10)
 
 """Do all of the SQL DB Charting """
 #chartsmain()
