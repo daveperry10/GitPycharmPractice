@@ -207,7 +207,7 @@ def simOnePath():
 #simOnePath()
 
 """Multiple Paths:  Stats and Histograms"""
-simMultiplePaths(10)
+simMultiplePaths(1000)
 
 """Do all of the SQL DB Charting """
 #chartsmain()

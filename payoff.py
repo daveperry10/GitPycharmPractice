@@ -168,12 +168,10 @@ def returnsByVintageAndMSA(df, msa):
     xx[['annReturns']].plot(kind='line',ax= ax)
     return
 
-def pivotHeatMap():
+def pivotHeatMap(p):
     fig, ax = plt.subplots()
     ax.imshow(p)
     ax.set_xticks(range(len(p.columns)))
-    ax.set_yticklabels(piv.index)
-    ax.set_xticklabels(piv.columns)
     ax.set_yticklabels(p.index)
     ax.set_xticklabels(p.columns)
     for i in range(len(p.columns)):
