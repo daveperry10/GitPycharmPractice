@@ -3,7 +3,7 @@ Module for reports that generate monthly payoffs
     -to be replaced by or moved into charts.py
 """
 
-import setup as s
+import data as s
 import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -126,7 +126,7 @@ def monthlyPayoffTimingByVintage():
 
 def monthlyPayoffTimingAllVintages():
     import matplotlib.ticker as t
-    import setup as s
+    import data as s
     import pathlib
     df = s.getData()
     s.addCalulatedFields(df)

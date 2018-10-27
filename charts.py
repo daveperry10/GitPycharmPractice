@@ -7,10 +7,24 @@ Charts Module:
 - class Charts(): generic charting functions that filter based on key word arguments
 """
 
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import setup as s
+import data as s
+import plotly
+import plotly.graph_objs as go
+import plotly.tools as tls
+import plotly.plotly as py
+import matplotlib.colors
+import pathlib
+
+SOTW_GREEN = (139 / 256, 198 / 256, 62 / 256, 1)
+SOTW_BLUE = (0 / 256, 186 / 256, 241 / 256, 1)
+SOTW_RED = (241 / 256, 89 / 256, 41 / 256, 1)
+SOTW_YELLOW = (252 / 256, 184 / 256, 37 / 256, 1)
+
+OUTPUT_PATH = pathlib.Path("C:/Users/Dave/Documents/Sum/Analytics/Output")
 
 def plotCaseSchiller(df):
 
@@ -24,13 +38,13 @@ def plotCaseSchiller(df):
     fig, ax1 = plt.subplots()
     ax1.set_xlabel('Year')
     ax1.set_ylabel('Real Home Prices')
-    line1 = ax1.plot(df['yr'], df['real_home_price'], color=s.SOTW_GREEN)
-    line2 = ax1.plot(df['yr'], df['nominal_home_price'], color=s.SOTW_YELLOW)
+    line1 = ax1.plot(df['yr'], df['real_home_price'], color=SOTW_GREEN)
+    line2 = ax1.plot(df['yr'], df['nominal_home_price'], color=SOTW_YELLOW)
     ax1.tick_params(axis='y')
 
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     ax2.set_ylabel('CPI')  # we already handled the x-label with ax1
-    line3 = ax2.plot(df['yr'], df['CPI'], color=s.SOTW_BLUE)
+    line3 = ax2.plot(df['yr'], df['CPI'], color=SOTW_BLUE)
     ax2.tick_params(axis='y')
 
     lines = line1 + line2 + line3
@@ -38,8 +52,8 @@ def plotCaseSchiller(df):
     plt.legend(lines, ['Real Home Prices', 'Nominal Home Prices', 'CPI'], loc=0, fontsize = 9)
 
     fig.tight_layout()
-    plt.savefig(s.OUTPUT_PATH / "Historical Home Prices (Schiller).png")
-    df.to_csv(s.OUTPUT_PATH / "Historical Home Prices (Schiller).csv")
+    plt.savefig(OUTPUT_PATH / "Historical Home Prices (Schiller).png")
+    df.to_csv(OUTPUT_PATH / "Historical Home Prices (Schiller).csv")
     return 1
 
 
@@ -80,8 +94,8 @@ def gridOfMultiplesAndDiscounts():
 
     ax.set(xlabel='Multiple', ylabel='Discount',title='IRR by Investor Multiple and Discount')
 
-    fig.savefig(s.OUTPUT_PATH / "Grid of Multiples and Discounts.png")
-    pd.DataFrame(matrix, index=xlables, columns = ylables).T.to_csv(s.OUTPUT_PATH / "Grid of Multiples and Discounts.csv")
+    fig.savefig(OUTPUT_PATH / "Grid of Multiples and Discounts.png")
+    pd.DataFrame(matrix, index=xlables, columns = ylables).T.to_csv(OUTPUT_PATH / "Grid of Multiples and Discounts.csv")
     return
 
 
@@ -130,8 +144,8 @@ def gridOfIRR(d, **kwargs):
     else:
         ax.set_title('IRR by Vintage, Age at Termination, MSA: ' + titleStringList[0], fontsize=10)
 
-    fig.savefig(s.OUTPUT_PATH / ('Grid of IRR -  MSA ' + titleStringList[0] + '.png'))
-    bb.to_csv(s.OUTPUT_PATH / ('Grid of IRR -  MSA ' + titleStringList[0] + '.csv'))
+    fig.savefig(OUTPUT_PATH / ('Grid of IRR -  MSA ' + titleStringList[0] + '.png'))
+    bb.to_csv(OUTPUT_PATH / ('Grid of IRR -  MSA ' + titleStringList[0] + '.csv'))
     plt.show()
 
     #titleStringList[0] = titlestring
@@ -168,8 +182,8 @@ def histAppreciationVsPayoff(df, **kwargs):
     a.payoffPct.hist(bins = binrange, ax=axes[1])
     fig.suptitle('Appreciation vs Payoff' + titleStringList[0], fontsize = 12)
 
-    fig.savefig(s.OUTPUT_PATH / ('Hist of Appreciation vs Payoff' + titleStringList[0] + '.png'))
-    filt[['loan_id', 'appreciation', 'payoffPct']].to_csv(s.OUTPUT_PATH / ('Hist of Appreciation vs Payoff' + titleStringList[0] +'.csv'))
+    fig.savefig(OUTPUT_PATH / ('Hist of Appreciation vs Payoff' + titleStringList[0] + '.png'))
+    filt[['loan_id', 'appreciation', 'payoffPct']].to_csv(OUTPUT_PATH / ('Hist of Appreciation vs Payoff' + titleStringList[0] +'.csv'))
     return
 
 class Chart():
@@ -189,6 +203,7 @@ class Chart():
         :keyword sharex: passed to plt.subplots
         :keyword sharey: passed to plt.subplots
         :keyword title: figure suptitle
+        :keyword plotly: add the chart to plotly
         """
 
         sharey = kwargs.get('sharey', True)
@@ -196,21 +211,31 @@ class Chart():
         hspace = kwargs.get('hspace', 0.2)
         top = kwargs.get('top', 0.95)
         bottom = kwargs.get('bottom', 0.14)
-
-        self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        plt.subplots_adjust(hspace=hspace, top=top, bottom=bottom)
-        self.fig.set_size_inches(7,9)
         self.title = kwargs.get('title', '')
-        self.fig.suptitle(self.title, fontsize=12)
-        self.path = s.OUTPUT_PATH
-        self.chartfilename = kwargs.get('chartfilename', self.title)
-        self.datafile = ""
+        self.plotly = kwargs.get('plotly', False)
 
-    def save (self):
+        self.path = OUTPUT_PATH
+        self.chartfilename = kwargs.get('chartfilename', self.title)
+
+        if self.plotly:
+            plotly.tools.set_credentials_file(username='daveperry10', api_key='VW3xYEyVXvJOh1ca2gio')
+            self.plotlyFig = plotly.tools.make_subplots(rows=rows, cols=cols)
+            self.plotlyFig['layout'].update(height=900, width=700, title=self.title)#, legend=dict(orientation="h"))
+        else:
+            self.fig, self.axes = plt.subplots(rows, cols, sharex=sharex, sharey=sharey)
+            plt.subplots_adjust(hspace=hspace, top=top, bottom=bottom)
+            self.fig.set_size_inches(7, 9)
+            self.fig.suptitle(self.title, fontsize=12)
+
+    def plotly(self):
+        plotly_fig = tls.mpl_to_plotly(self.fig)
+        unique_url = py.plot(plotly_fig, fileopt='overwrite', auto_open=False)
+        print(unique_url)
+
+    def save(self):
         self.fig.savefig(self.path / (self.chartfilename + '.png'))
 
     def kwargFilter(self, df, titleStringList, **kwargs):
-
         """ kwargFilter:
         - Take in key word arguments and return a filtered DF
         - If a key doesn't match in the list of column names, keep going (not all keywords are meant to be filters)
@@ -247,6 +272,7 @@ class Chart():
         :keyword title: subplot title if you need one
         :keyword kind: type of chart ('line' or 'hist')
         :keyword style: color/style to be passed to df.plot()
+        :keyword plotly: do it in plotly
         :return: return 1
         """
 
@@ -254,30 +280,42 @@ class Chart():
         kind = kwargs.get('kind', 'line')
         bins = kwargs.get('bins', 25)
         legend = kwargs.get('legend',True)
-        secondary  = kwargs.get('secondary',False)
+        secondary = kwargs.get('secondary',False)
         linestyle = kwargs.get('linestyle', '-')
         color = kwargs.get('color', 'k')
 
-        try:
-            ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
-        except:
-            print('error: bad chart location')
-            return 1
+        if self.plotly:
 
-        if kind == 'line':
-            if df._typ != 'series':
-                if len(df.columns) == 1:
-                    df.columns = [df.name]
-            if secondary:
-                df.plot(ax=ax.twinx(), legend=legend, linestyle=linestyle, color=color)
+            rgb = matplotlib.colors.to_rgb(color)
+            rgbString = 'rgb(' + str(int(rgb[0]*256)) + ',' + str(int(rgb[1]*256)) + ',' + str(int(rgb[2]*256)) + ')'
+            if linestyle == '--':
+                style = 'dash'
+            elif linestyle == '.-':
+                style = 'dotdash'
             else:
-                df.plot(ax=ax, legend=legend, linestyle=linestyle, color=color)
-        if kind == 'hist':
-            df.hist(ax=ax, bins=bins)
-            #title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
-            title = title + " Mean:" + str(round(df.mean(),2)) + " SD=" + str(round(df.std(),2))
+                style='solid'
 
-        ax.set_title(title, fontsize=9)
+            trace = dict(type='scatter', x=df.index, y=df.values, mode='lines', name=df.name, line=dict(dash=style, color=rgbString))
+            self.plotlyFig.append_trace(trace, loc[0]+1, loc[1]+1)         #plotly indexing starts at 1
+        else:
+            try:
+                ax = self.axes[loc[0]] if self.axes.ndim == 1 else self.axes[loc[0], loc[1]]
+            except:
+                print('error: bad chart location')
+                return 1
+            if kind == 'line':
+                if df._typ != 'series':
+                    if len(df.columns) == 1:
+                        df.columns = [df.name]
+                if secondary:
+                    df.plot(ax=ax.twinx(), legend=legend, linestyle=linestyle, color=color)
+                else:
+                    df.plot(ax=ax, legend=legend, linestyle=linestyle, color=color)
+            if kind == 'hist':
+                df.hist(ax=ax, bins=bins)
+                #title = title + " Mean:" + "{:.1%}".format(df.mean()) + " SD=" + "{:.1%}".format(df.std())
+                title = title + " Mean:" + str(round(df.mean(),2)) + " SD=" + str(round(df.std(),2))
+            ax.set_title(title, fontsize=9)
         return 0
 
 

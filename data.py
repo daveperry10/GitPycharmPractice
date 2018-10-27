@@ -8,13 +8,6 @@ import pymysql as db
 import pandas as pd
 import numpy as np
 
-OUTPUT_PATH = Path("C:/Users/Dave/Documents/Sum/Analytics/Output")
-INPUT_PATH = Path("C:/Users/Dave/Documents/Sum/Analytics/Data")
-SOTW_GREEN = (139 / 256, 198 / 256, 62 / 256, 1)
-SOTW_BLUE = (0 / 256, 186 / 256, 241 / 256, 1)
-SOTW_RED = (241 / 256, 89 / 256, 41 / 256, 1)
-SOTW_YELLOW = (252 / 256, 184 / 256, 37 / 256, 1)
-
 class Data():
 
     """ Class for database operations and central DataFrame location
